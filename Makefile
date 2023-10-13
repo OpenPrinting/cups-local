@@ -1,7 +1,7 @@
 #
-# Top-level Makefile for the CUPS commands.
+# Top-level Makefile for the CUPS Local Services.
 #
-# Copyright © 2022 by OpenPrinting.
+# Copyright © 2022-2023 by OpenPrinting.
 #
 # Licensed under Apache License v2.0.  See the file "LICENSE" for more
 # information.
@@ -13,7 +13,8 @@ include Makedefs
 # Source directories...
 DIRS	=	\
 		commands \
-		locale \
+		daemon \
+		doc \
 		man
 
 

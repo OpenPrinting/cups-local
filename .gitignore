@@ -1,3 +1,4 @@
+/autom4te*.cache
 /commands/cancel
 /commands/cupsaccept
 /commands/cupsenable
