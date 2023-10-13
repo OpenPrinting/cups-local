@@ -1,5 +1,5 @@
-CUPS Local Server v3 (cups-local)
-=================================
+CUPS Local Services (cups-local)
+================================
 
 ![Version](https://img.shields.io/github/v/release/OpenPrinting/cups-local?include_prereleases)
 ![Apache 2.0](https://img.shields.io/github/license/OpenPrinting/cups-local)
@@ -10,10 +10,10 @@ CUPS Local Server v3 (cups-local)
 > "cups-sharing" projects.  Right now all of this code should be considered
 > alpha-quality for testing purposes only!
 
-The CUPS Local Server provides a local, per-user spooler that handles conversion
-of print files and communications with IPP printers.  This project is part of
-OpenPrinting's CUPS 3.0 development, which will provide a 100% driverless
-printing system for Unix®-like operating systems.
+The CUPS Local Services provide the general printing commands and a local, per-
+user spooler that handles conversion of print files and communications with IPP
+printers.  This project is part of OpenPrinting's CUPS 3.0 development, which
+will provide a 100% driverless printing system for Unix®-like operating systems.
 
 
 Reading the Documentation
