@@ -1,7 +1,7 @@
 #
-# Commands makefile for the CUPS commands.
+# Commands makefile for cups-local.
 #
-# Copyright © 2022 by OpenPrinting.
+# Copyright © 2022-2023 by OpenPrinting.
 #
 # Licensed under Apache License v2.0.  See the file "LICENSE" for more
 # information.
@@ -64,7 +64,7 @@ clean:
 #
 
 depend:
-	$(CC) -MM $(CPPFLAGS) $(OBJS:.o=.c) >Dependencies
+	$(CC) -MM $(CPPFLAGS) $(OBJS:.o=.c) | sed -e '1,$$s/ \/usr\/include\/[^ ]*//g' -e '1,$$s/ \/usr\/local\/include\/[^ ]*//g' >Dependencies
 
 
 #

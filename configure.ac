@@ -1,7 +1,7 @@
 dnl
 dnl Configuration script for the CUPS commands.
 dnl
-dnl Copyright © 2022 by OpenPrinting.
+dnl Copyright © 2022-2023 by OpenPrinting.
 dnl
 dnl Licensed under Apache License v2.0.  See the file "LICENSE" for more
 dnl information.
@@ -19,7 +19,7 @@ AC_PREREQ([2.70])
 
 
 dnl Package name and version...
-AC_INIT([CUPS_COMMANDS], [3.0b1], [https://github.com/OpenPrinting/cups-commands/issues], [cups-commands], [https://openprinting.github.io/cups])
+AC_INIT([cups_commands], [3.0b1], [https://github.com/OpenPrinting/cups-commands/issues], [cups-commands], [https://openprinting.github.io/cups])
 AC_CONFIG_HEADERS([config.h])
 
 CUPS_VERSION="AC_PACKAGE_VERSION"
@@ -85,8 +85,53 @@ AS_IF([$PKGCONFIG --exists cups3], [
     LIBS="$LIBS $($PKGCONFIG --libs cups3)"
 ], [
     AC_MSG_RESULT(no)
-    AC_MSG_ERROR([Required CUPS library v3 is not present.])
+    AC_MSG_ERROR([CUPS library v3.0 or later is required.])
 ])
+
+
+dnl PAPPL library...
+AS_IF([$PKGCONFIG --exists pappl --atleast-version=2.0], [
+    CPPFLAGS="$CFLAGS $($PKGCONFIG --cflags pappl)"
+    LIBS="$LIBS $($PKGCONFIG --libs pappl)"
+], [
+    AC_MSG_ERROR([PAPPL v2.0 or later is required.])
+])
+
+
+dnl Check for DBUS support
+DBUSDIR=""
+
+AC_ARG_ENABLE([dbus], AS_HELP_STRING([--disable-dbus], [build without D-Bus support]))
+AC_ARG_WITH([dbusdir], AS_HELP_STRING([--with-dbusdir], [set D-Bus configuration directory]), [
+    DBUSDIR="$withval"
+])
+
+AS_IF([test "x$enable_dbus" != xno], [
+    AC_MSG_CHECKING([for D-Bus])
+    AS_IF([$PKGCONFIG --exists dbus-1], [
+	AC_MSG_RESULT([yes])
+	AC_DEFINE([HAVE_DBUS], [1], [Have dbus library?])
+	CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags dbus-1) -DDBUS_API_SUBJECT_TO_CHANGE"
+	LIBS="$LIBS $($PKGCONFIG --libs dbus-1)"
+	AC_CHECK_FUNC([dbus_message_iter_init_append], [
+	    AC_DEFINE([HAVE_DBUS_MESSAGE_ITER_INIT_APPEND], [1], [Have dbus_message_iter_init_append function?])
+	])
+	AC_CHECK_FUNC([dbus_threads_init_default], [
+	    AC_DEFINE([HAVE_DBUS_THREADS_INIT], [1], [Have dbus_threads_init_default function?])
+	])
+	AS_IF([test -d /etc/dbus-1 -a "x$DBUSDIR" = x], [
+	    DBUSDIR="/etc/dbus-1"
+	], [test -d /usr/local/etc/dbus-1 -a "x$DBUSDIR" = x], [
+	    DBUSDIR="/usr/local/etc/dbus-1"
+	], [test "x$DBUSDIR" = x], [
+	    AC_MSG_ERROR([No default D-Bus directory found, use --with-dbus-dir option.])
+	])
+    ], [
+	AC_MSG_RESULT([no])
+    ])
+])
+
+AC_SUBST([DBUSDIR])
 
 
 dnl Extra compiler options...
@@ -173,9 +218,9 @@ AS_IF([test -n "$GCC"], [
     ], [darwin*], [
         AS_IF([test "$host_os_version" -ge 200 -a x$enable_debug != xyes], [
             # macOS 11.0 and higher support the Apple Silicon (arm64) CPUs
-	    OPTIM="$OPTIM -mmacosx-version-min=10.14 -arch x86_64 -arch arm64"
+	    OPTIM="$OPTIM -mmacosx-version-min=11.0 -arch x86_64 -arch arm64"
 	], [test x$enable_debug != xyes], [
-	    OPTIM="$OPTIM -mmacosx-version-min=10.14 -arch x86_64"
+	    OPTIM="$OPTIM -mmacosx-version-min=11.0 -arch x86_64"
 	])
     ])
 ])

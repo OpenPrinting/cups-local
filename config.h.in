@@ -1,7 +1,7 @@
 //
-// Configuration file for the CUPS commands.
+// Configuration file for cups-local.
 //
-// Copyright © 2022 by OpenPrinting.
+// Copyright © 2022-2023 by OpenPrinting.
 //
 // Licensed under Apache License v2.0.  See the file "LICENSE" for more
 // information.
@@ -13,6 +13,18 @@
 
 // Version number
 #define CUPS_VERSION ""
+
+
+// Do we have D-Bus?
+#undef HAVE_DBUS
+
+
+// Have dbus_message_iter_init_append function?
+#undef HAVE_DBUS_MESSAGE_ITER_INIT_APPEND
+
+
+// Have dbus_threads_init_default function?
+#undef HAVE_DBUS_THREADS_INIT
 
 
 #endif // !CUPS_COMMANDS_CONFIG_H
