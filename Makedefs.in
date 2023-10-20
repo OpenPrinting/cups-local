@@ -1,5 +1,5 @@
 #
-# Common makefile definitions for the CUPS commands.
+# Common makefile definitions for cups-local.
 #
 # Copyright © 2022-2023 by OpenPrinting.
 #
@@ -7,8 +7,8 @@
 # information.
 #
 
-# Version of the CUPS commands
-CUPS_VERSION =	@CUPS_VERSION@
+# Version of cups-local
+CUPS_LOCAL_VERSION =	@CUPS_LOCAL_VERSION@
 
 
 # Programs...
@@ -63,6 +63,7 @@ sharedstatedir	=	@sharedstatedir@
 srcdir		=	@srcdir@
 sysconfdir	=	@sysconfdir@
 top_srcdir	=	@top_srcdir@
+CUPS_LOCAL_DATADIR =	@CUPS_LOCAL_DATADIR@
 DBUSDIR		=	@DBUSDIR@
 
 BUILDROOT	=	$(DSTROOT)$(RPM_BUILD_ROOT)$(DESTDIR)

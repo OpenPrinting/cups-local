@@ -1,49 +1,48 @@
-/*
- * "lpmove" command for CUPS.
- *
- * Copyright © 2021-2022 by OpenPrinting.
- * Copyright © 2007-2018 by Apple Inc.
- * Copyright © 1997-2006 by Easy Software Products.
- *
- * Licensed under Apache License v2.0.  See the file "LICENSE" for more
- * information.
- */
+//
+// "lpmove" command for CUPS.
+//
+// Copyright © 2021-2023 by OpenPrinting.
+// Copyright © 2007-2018 by Apple Inc.
+// Copyright © 1997-2006 by Easy Software Products.
+//
+// Licensed under Apache License v2.0.  See the file "LICENSE" for more
+// information.
+//
 
-/*
- * Include necessary headers...
- */
-
-#include <cups/cups-private.h>
+#include <config.h>
+#include <cups/cups.h>
 
 
-/*
- * Local functions...
- */
+//
+// Local functions...
+//
 
 static int	move_job(http_t *http, const char *src, int jobid, const char *dest);
 static void	usage(void) _CUPS_NORETURN;
 
 
-/*
- * 'main()' - Parse options and show status information.
- */
+//
+// 'main()' - Parse options and show status information.
+//
 
 int
-main(int  argc,				/* I - Number of command-line arguments */
-     char *argv[])			/* I - Command-line arguments */
+main(int  argc,				// I - Number of command-line arguments
+     char *argv[])			// I - Command-line arguments
 {
-  int		i;			/* Looping var */
-  http_t	*http;			/* Connection to server */
-  const char	*opt,			/* Option pointer */
-		*job;			/* Job name */
-  int		jobid;			/* Job ID */
-  int		num_dests;		/* Number of destinations */
-  cups_dest_t	*dests;			/* Destinations */
-  const char	*src,			/* Original queue */
-		*dest;			/* New destination */
+  int		i;			// Looping var
+  http_t	*http;			// Connection to server
+  const char	*opt,			// Option pointer
+		*job;			// Job name
+  int		jobid;			// Job ID
+  int		num_dests;		// Number of destinations
+  cups_dest_t	*dests;			// Destinations
+  const char	*src,			// Original queue
+		*dest;			// New destination
 
 
-  _cupsSetLocale(argv);
+  // Setup localization...
+  cupsLangSetDirectory(CUPS_LOCAL_DATADIR);
+  cupsLangSetLocale(argv);
 
   dest      = NULL;
   dests     = NULL;
@@ -62,16 +61,16 @@ main(int  argc,				/* I - Number of command-line arguments */
       {
 	switch (*opt)
 	{
-	  case 'E' : /* Encrypt */
+	  case 'E' : // Encrypt
 #ifdef HAVE_TLS
 	      cupsSetEncryption(HTTP_ENCRYPT_REQUIRED);
 
 #else
-	      _cupsLangPrintf(stderr, _("%s: Sorry, no encryption support."), argv[0]);
-#endif /* HAVE_TLS */
+	      cupsLangPrintf(stderr, _("%s: Sorry, no encryption support."), argv[0]);
+#endif // HAVE_TLS
 	      break;
 
-	  case 'h' : /* Connect to host */
+	  case 'h' : // Connect to host
 	      if (opt[1] != '\0')
 	      {
 		cupsSetServer(opt + 1);
@@ -83,7 +82,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 
 		if (i >= argc)
 		{
-		  _cupsLangPuts(stderr, _("Error: need hostname after \"-h\" option."));
+		  cupsLangPuts(stderr, _("Error: need hostname after \"-h\" option."));
 		  usage();
 		}
 
@@ -92,7 +91,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 	      break;
 
 	  default :
-	      _cupsLangPrintf(stderr, _("%s: Unknown option \"%c\"."), argv[0], *opt);
+	      cupsLangPrintf(stderr, _("%s: Unknown option \"%c\"."), argv[0], *opt);
 	      usage();
 	}
       }
@@ -115,7 +114,7 @@ main(int  argc,				/* I - Number of command-line arguments */
       dest = argv[i];
     else
     {
-      _cupsLangPrintf(stderr, _("lpmove: Unknown argument \"%s\"."), argv[i]);
+      cupsLangPrintf(stderr, _("lpmove: Unknown argument \"%s\"."), argv[i]);
       usage();
     }
   }
@@ -123,11 +122,11 @@ main(int  argc,				/* I - Number of command-line arguments */
   if ((!jobid && !src) || !dest)
     usage();
 
-  http = httpConnectEncrypt(cupsServer(), ippPort(), cupsEncryption());
+  http = httpConnectEncrypt(cupsGetServer(), ippGetPort(), cupsEncryption());
 
   if (http == NULL)
   {
-    _cupsLangPrintf(stderr, _("lpmove: Unable to connect to server: %s"),
+    cupsLangPrintf(stderr, _("lpmove: Unable to connect to server: %s"),
 		    strerror(errno));
     return (1);
   }
@@ -136,19 +135,19 @@ main(int  argc,				/* I - Number of command-line arguments */
 }
 
 
-/*
- * 'move_job()' - Move a job.
- */
+//
+// 'move_job()' - Move a job.
+//
 
-static int				/* O - 0 on success, 1 on error */
-move_job(http_t     *http,		/* I - HTTP connection to server */
-         const char *src,		/* I - Source queue */
-         int        jobid,		/* I - Job ID */
-	 const char *dest)		/* I - Destination queue */
+static int				// O - 0 on success, 1 on error
+move_job(http_t     *http,		// I - HTTP connection to server
+         const char *src,		// I - Source queue
+         int        jobid,		// I - Job ID
+	 const char *dest)		// I - Destination queue
 {
-  ipp_t	*request;			/* IPP Request */
-  char	job_uri[HTTP_MAX_URI],		/* job-uri */
-	printer_uri[HTTP_MAX_URI];	/* job-printer-uri */
+  ipp_t	*request;			// IPP Request
+  char	job_uri[HTTP_MAX_URI],		// job-uri
+	printer_uri[HTTP_MAX_URI];	// job-printer-uri
 
 
   if (!http)
@@ -182,7 +181,7 @@ move_job(http_t     *http,		/* I - HTTP connection to server */
   }
 
   ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name",
-               NULL, cupsUser());
+               NULL, cupsGetUser());
 
   httpAssembleURIf(HTTP_URI_CODING_ALL, printer_uri, sizeof(printer_uri),
                    "ipp", NULL, "localhost", 0, "/printers/%s", dest);
@@ -195,9 +194,9 @@ move_job(http_t     *http,		/* I - HTTP connection to server */
 
   ippDelete(cupsDoRequest(http, request, "/jobs"));
 
-  if (cupsLastError() > IPP_OK_CONFLICT)
+  if (cupsGetError() > IPP_STATUS_OK_CONFLICTING)
   {
-    _cupsLangPrintf(stderr, "lpmove: %s", cupsLastErrorString());
+    cupsLangPrintf(stderr, "lpmove: %s", cupsGetErrorString());
     return (1);
   }
   else
@@ -205,19 +204,19 @@ move_job(http_t     *http,		/* I - HTTP connection to server */
 }
 
 
-/*
- * 'usage()' - Show program usage and exit.
- */
+//
+// 'usage()' - Show program usage and exit.
+//
 
 static void
 usage(void)
 {
-  _cupsLangPuts(stdout, _("Usage: lpmove [options] job destination\n"
+  cupsLangPuts(stdout, _("Usage: lpmove [options] job destination\n"
                           "       lpmove [options] source-destination destination"));
-  _cupsLangPuts(stdout, _("Options:"));
-  _cupsLangPuts(stdout, _("-E                      Encrypt the connection to the server"));
-  _cupsLangPuts(stdout, _("-h server[:port]        Connect to the named server and port"));
-  _cupsLangPuts(stdout, _("-U username             Specify the username to use for authentication"));
+  cupsLangPuts(stdout, _("Options:"));
+  cupsLangPuts(stdout, _("-E                      Encrypt the connection to the server"));
+  cupsLangPuts(stdout, _("-h server[:port]        Connect to the named server and port"));
+  cupsLangPuts(stdout, _("-U username             Specify the username to use for authentication"));
 
   exit(1);
 }

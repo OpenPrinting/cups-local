@@ -1,52 +1,51 @@
-/*
- * Printer option program for CUPS.
- *
- * Copyright © 2007-2018 by Apple Inc.
- * Copyright © 1997-2006 by Easy Software Products.
- *
- * Licensed under Apache License v2.0.  See the file "LICENSE" for more
- * information.
- */
+//
+// Printer option program for CUPS.
+//
+// Copyright © 2023 by OpenPrinting.
+// Copyright © 2007-2018 by Apple Inc.
+// Copyright © 1997-2006 by Easy Software Products.
+//
+// Licensed under Apache License v2.0.  See the file "LICENSE" for more
+// information.
+//
 
-/*
- * Include necessary headers...
- */
-
-#include <cups/cups-private.h>
-#include <cups/ppd-private.h>
+#include <config.h>
+#include <cups/cups.h>
 
 
-/*
- * Local functions...
- */
+//
+// Local functions...
+//
 
 static void	list_group(ppd_file_t *ppd, ppd_group_t *group);
 static void	list_options(cups_dest_t *dest);
 static void	usage(void) _CUPS_NORETURN;
 
 
-/*
- * 'main()' - Main entry.
- */
+//
+// 'main()' - Main entry.
+//
 
-int					/* O - Exit status */
-main(int  argc,				/* I - Number of command-line arguments */
-     char *argv[])			/* I - Command-line arguments */
+int					// O - Exit status
+main(int  argc,				// I - Number of command-line arguments
+     char *argv[])			// I - Command-line arguments
 {
-  int		i, j;			/* Looping vars */
-  int		changes;		/* Did we make changes? */
-  int		num_options;		/* Number of options */
-  cups_option_t	*options;		/* Options */
-  int		num_dests;		/* Number of destinations */
-  cups_dest_t	*dests;			/* Destinations */
-  cups_dest_t	*dest;			/* Current destination */
-  char		*opt,			/* Option pointer */
-		*printer,		/* Printer name */
-		*instance,		/* Instance name */
- 		*option;		/* Current option */
+  int		i, j;			// Looping vars
+  int		changes;		// Did we make changes?
+  int		num_options;		// Number of options
+  cups_option_t	*options;		// Options
+  int		num_dests;		// Number of destinations
+  cups_dest_t	*dests;			// Destinations
+  cups_dest_t	*dest;			// Current destination
+  char		*opt,			// Option pointer
+		*printer,		// Printer name
+		*instance,		// Instance name
+ 		*option;		// Current option
 
 
-  _cupsSetLocale(argv);
+  // Setup localization...
+  cupsLangSetDirectory(CUPS_LOCAL_DATADIR);
+  cupsLangSetLocale(argv);
 
  /*
   * Loop through the command-line arguments...
@@ -69,7 +68,7 @@ main(int  argc,				/* I - Number of command-line arguments */
       {
 	switch (*opt)
 	{
-	  case 'd' : /* -d printer */
+	  case 'd' : // -d printer
 	      if (opt[1] != '\0')
 	      {
 		printer = opt + 1;
@@ -92,7 +91,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 
 	      if (num_dests == 0 || !dests || (dest = cupsGetDest(printer, instance, num_dests, dests)) == NULL)
 	      {
-		_cupsLangPuts(stderr, _("lpoptions: Unknown printer or class."));
+		cupsLangPuts(stderr, _("lpoptions: Unknown printer or class."));
 		return (1);
 	      }
 
@@ -115,7 +114,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 					      num_options, &options);
 	      break;
 
-	  case 'h' : /* -h server */
+	  case 'h' : // -h server
 	      if (opt[1] != '\0')
 	      {
 		cupsSetServer(opt + 1);
@@ -131,11 +130,11 @@ main(int  argc,				/* I - Number of command-line arguments */
 	      }
 	      break;
 
-	  case 'E' : /* Encrypt connection */
+	  case 'E' : // Encrypt connection
 	      cupsSetEncryption(HTTP_ENCRYPT_REQUIRED);
 	      break;
 
-	  case 'l' : /* -l (list options) */
+	  case 'l' : // -l (list options)
 	      if (dest == NULL)
 	      {
 		if (num_dests == 0)
@@ -146,14 +145,14 @@ main(int  argc,				/* I - Number of command-line arguments */
 	      }
 
 	      if (dest == NULL)
-		_cupsLangPuts(stderr, _("lpoptions: No printers."));
+		cupsLangPuts(stderr, _("lpoptions: No printers."));
 	      else
 		list_options(dest);
 
 	      changes = -1;
 	      break;
 
-	  case 'o' : /* -o option[=value] */
+	  case 'o' : // -o option[=value]
 	      if (dest == NULL)
 	      {
 		if (num_dests == 0)
@@ -164,7 +163,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 
 		if (dest == NULL)
 		{
-		  _cupsLangPuts(stderr, _("lpoptions: No printers."));
+		  cupsLangPuts(stderr, _("lpoptions: No printers."));
 		  return (1);
 		}
 
@@ -192,7 +191,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 	      changes = 1;
 	      break;
 
-	  case 'p' : /* -p printer */
+	  case 'p' : // -p printer
 	      if (opt[1] != '\0')
 	      {
 		printer = opt + 1;
@@ -220,7 +219,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 
 		if (dest == NULL)
 		{
-		  _cupsLangPrintf(stderr, _("lpoptions: Unable to add printer or instance: %s"), strerror(errno));
+		  cupsLangPrintf(stderr, _("lpoptions: Unable to add printer or instance: %s"), strerror(errno));
 		  return (1);
 		}
 	      }
@@ -232,7 +231,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 					      num_options, &options);
 	      break;
 
-	  case 'r' : /* -r option (remove) */
+	  case 'r' : // -r option (remove)
 	      if (dest == NULL)
 	      {
 		if (num_dests == 0)
@@ -243,7 +242,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 
 		if (dest == NULL)
 		{
-		  _cupsLangPuts(stderr, _("lpoptions: No printers."));
+		  cupsLangPuts(stderr, _("lpoptions: No printers."));
 		  return (1);
 		}
 
@@ -274,7 +273,7 @@ main(int  argc,				/* I - Number of command-line arguments */
 	      changes = 1;
 	      break;
 
-	  case 'x' : /* -x printer */
+	  case 'x' : // -x printer
 	      if (opt[1] != '\0')
 	      {
 		printer = opt + 1;
@@ -346,8 +345,8 @@ main(int  argc,				/* I - Number of command-line arguments */
   }
   else if (changes == 0)
   {
-    char	buffer[10240],		/* String for options */
-		*ptr;			/* Pointer into string */
+    char	buffer[10240],		// String for options
+		*ptr;			// Pointer into string
 
     num_options = dest->num_options;
     options     = dest->options;
@@ -370,26 +369,26 @@ main(int  argc,				/* I - Number of command-line arguments */
       ptr += strlen(ptr);
     }
 
-    _cupsLangPuts(stdout, buffer);
+    cupsLangPuts(stdout, buffer);
   }
 
   return (0);
 }
 
-/*
- * 'list_group()' - List printer-specific options from the PPD group.
- */
+//
+// 'list_group()' - List printer-specific options from the PPD group.
+//
 
 static void
-list_group(ppd_file_t  *ppd,		/* I - PPD file */
-           ppd_group_t *group)		/* I - Group to show */
+list_group(ppd_file_t  *ppd,		// I - PPD file
+           ppd_group_t *group)		// I - Group to show
 {
-  int		i, j;			/* Looping vars */
-  ppd_option_t	*option;		/* Current option */
-  ppd_choice_t	*choice;		/* Current choice */
-  ppd_group_t	*subgroup;		/* Current subgroup */
-  char		buffer[10240],		/* Option string buffer */
-		*ptr;			/* Pointer into option string */
+  int		i, j;			// Looping vars
+  ppd_option_t	*option;		// Current option
+  ppd_choice_t	*choice;		// Current choice
+  ppd_group_t	*subgroup;		// Current subgroup
+  char		buffer[10240],		// Option string buffer
+		*ptr;			// Pointer into option string
 
 
   for (i = group->num_options, option = group->options; i > 0; i --, option ++)
@@ -406,10 +405,10 @@ list_group(ppd_file_t  *ppd,		/* I - PPD file */
     {
       if (!_cups_strcasecmp(choice->choice, "Custom"))
       {
-        ppd_coption_t	*coption;	/* Custom option */
-        ppd_cparam_t	*cparam;	/* Custom parameter */
+        ppd_coption_t	*coption;	// Custom option
+        ppd_cparam_t	*cparam;	// Custom parameter
 	static const char * const types[] =
-	{				/* Parameter types */
+	{				// Parameter types
 	  "CURVE",
 	  "INTEGER",
 	  "INVCURVE",
@@ -435,7 +434,7 @@ list_group(ppd_file_t  *ppd,		/* I - PPD file */
 	    snprintf(ptr, sizeof(buffer) - (size_t)(ptr - buffer), " %sCustom.%s", choice->marked ? "*" : "", types[cparam->type]);
 	  else
 	  {
-	    const char	*prefix;	/* Prefix string */
+	    const char	*prefix;	// Prefix string
 
 
             if (choice->marked)
@@ -464,7 +463,7 @@ list_group(ppd_file_t  *ppd,		/* I - PPD file */
       ptr += strlen(ptr);
     }
 
-    _cupsLangPuts(stdout, buffer);
+    cupsLangPuts(stdout, buffer);
   }
 
   for (i = group->num_subgroups, subgroup = group->subgroups; i > 0; i --, subgroup ++)
@@ -472,25 +471,25 @@ list_group(ppd_file_t  *ppd,		/* I - PPD file */
 }
 
 
-/*
- * 'list_options()' - List printer-specific options from the PPD file.
- */
+//
+// 'list_options()' - List printer-specific options from the PPD file.
+//
 
 static void
-list_options(cups_dest_t *dest)		/* I - Destination to list */
+list_options(cups_dest_t *dest)		// I - Destination to list
 {
-  http_t	*http;			/* Connection to destination */
-  char		resource[1024];		/* Resource path */
-  int		i;			/* Looping var */
-  const char	*filename;		/* PPD filename */
-  ppd_file_t	*ppd;			/* PPD data */
-  ppd_group_t	*group;			/* Current group */
+  http_t	*http;			// Connection to destination
+  char		resource[1024];		// Resource path
+  int		i;			// Looping var
+  const char	*filename;		// PPD filename
+  ppd_file_t	*ppd;			// PPD data
+  ppd_group_t	*group;			// Current group
 
 
   if ((http = cupsConnectDest(dest, CUPS_DEST_FLAGS_NONE, 30000, NULL, resource, sizeof(resource), NULL, NULL)) == NULL)
   {
-    _cupsLangPrintf(stderr, _("lpoptions: Unable to get PPD file for %s: %s"),
-		    dest->name, cupsLastErrorString());
+    cupsLangPrintf(stderr, _("lpoptions: Unable to get PPD file for %s: %s"),
+		    dest->name, cupsGetErrorString());
     return;
   }
 
@@ -498,8 +497,8 @@ list_options(cups_dest_t *dest)		/* I - Destination to list */
   {
     httpClose(http);
 
-    _cupsLangPrintf(stderr, _("lpoptions: Unable to get PPD file for %s: %s"),
-		    dest->name, cupsLastErrorString());
+    cupsLangPrintf(stderr, _("lpoptions: Unable to get PPD file for %s: %s"),
+		    dest->name, cupsGetErrorString());
     return;
   }
 
@@ -508,7 +507,7 @@ list_options(cups_dest_t *dest)		/* I - Destination to list */
   if ((ppd = ppdOpenFile(filename)) == NULL)
   {
     unlink(filename);
-    _cupsLangPrintf(stderr, _("lpoptions: Unable to open PPD file for %s."),
+    cupsLangPrintf(stderr, _("lpoptions: Unable to open PPD file for %s."),
 		    dest->name);
     return;
   }
@@ -524,26 +523,26 @@ list_options(cups_dest_t *dest)		/* I - Destination to list */
 }
 
 
-/*
- * 'usage()' - Show program usage and exit.
- */
+//
+// 'usage()' - Show program usage and exit.
+//
 
 static void
 usage(void)
 {
-  _cupsLangPuts(stdout, _("Usage: lpoptions [options] -d destination\n"
+  cupsLangPuts(stdout, _("Usage: lpoptions [options] -d destination\n"
                           "       lpoptions [options] [-p destination] [-l]\n"
                           "       lpoptions [options] [-p destination] -o option[=value]\n"
                           "       lpoptions [options] -x destination"));
-  _cupsLangPuts(stdout, _("Options:"));
-  _cupsLangPuts(stdout, _("-d destination          Set default destination"));
-  _cupsLangPuts(stdout, _("-E                      Encrypt the connection to the server"));
-  _cupsLangPuts(stdout, _("-h server[:port]        Connect to the named server and port"));
-  _cupsLangPuts(stdout, _("-l                      Show supported options and values"));
-  _cupsLangPuts(stdout, _("-o name[=value]         Set default option and value"));
-  _cupsLangPuts(stdout, _("-p destination          Specify a destination"));
-  _cupsLangPuts(stdout, _("-U username             Specify the username to use for authentication"));
-  _cupsLangPuts(stdout, _("-x destination          Remove default options for destination"));
+  cupsLangPuts(stdout, _("Options:"));
+  cupsLangPuts(stdout, _("-d destination          Set default destination"));
+  cupsLangPuts(stdout, _("-E                      Encrypt the connection to the server"));
+  cupsLangPuts(stdout, _("-h server[:port]        Connect to the named server and port"));
+  cupsLangPuts(stdout, _("-l                      Show supported options and values"));
+  cupsLangPuts(stdout, _("-o name[=value]         Set default option and value"));
+  cupsLangPuts(stdout, _("-p destination          Specify a destination"));
+  cupsLangPuts(stdout, _("-U username             Specify the username to use for authentication"));
+  cupsLangPuts(stdout, _("-x destination          Remove default options for destination"));
 
   exit(1);
 }

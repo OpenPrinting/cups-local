@@ -1,47 +1,46 @@
-/*
- * "lprm" command for CUPS.
- *
- * Copyright © 2021-2022 by OpenPrinting.
- * Copyright © 2007-2018 by Apple Inc.
- * Copyright © 1997-2006 by Easy Software Products.
- *
- * Licensed under Apache License v2.0.  See the file "LICENSE" for more
- * information.
- */
+//
+// "lprm" command for CUPS.
+//
+// Copyright © 2021-2023 by OpenPrinting.
+// Copyright © 2007-2018 by Apple Inc.
+// Copyright © 1997-2006 by Easy Software Products.
+//
+// Licensed under Apache License v2.0.  See the file "LICENSE" for more
+// information.
+//
 
-/*
- * Include necessary headers...
- */
-
-#include <cups/cups-private.h>
+#include <config.h>
+#include <cups/cups.h>
 
 
-/*
- * Local functions...
- */
+//
+// Local functions...
+//
 
 static void	usage(void) _CUPS_NORETURN;
 
 
-/*
- * 'main()' - Parse options and cancel jobs.
- */
+//
+// 'main()' - Parse options and cancel jobs.
+//
 
-int				/* O - Exit status */
-main(int  argc,			/* I - Number of command-line arguments */
-     char *argv[])		/* I - Command-line arguments */
+int				// O - Exit status
+main(int  argc,			// I - Number of command-line arguments
+     char *argv[])		// I - Command-line arguments
 {
-  int		i;		/* Looping var */
-  int		job_id;		/* Job ID */
-  const char	*name;		/* Destination printer */
-  char		*instance,	/* Pointer to instance name */
-		*opt;		/* Option pointer */
-  cups_dest_t	*dest,		/* Destination */
-		*defdest;	/* Default destination */
-  int		did_cancel;	/* Did we cancel something? */
+  int		i;		// Looping var
+  int		job_id;		// Job ID
+  const char	*name;		// Destination printer
+  char		*instance,	// Pointer to instance name
+		*opt;		// Option pointer
+  cups_dest_t	*dest,		// Destination
+		*defdest;	// Default destination
+  int		did_cancel;	// Did we cancel something?
 
 
-  _cupsSetLocale(argv);
+  // Setup localization...
+  cupsLangSetDirectory(CUPS_LOCAL_DATADIR);
+  cupsLangSetLocale(argv);
 
  /*
   * Setup to cancel individual print jobs...
@@ -65,15 +64,15 @@ main(int  argc,			/* I - Number of command-line arguments */
       {
 	switch (*opt)
 	{
-	  case 'E' : /* Encrypt */
+	  case 'E' : // Encrypt
 #ifdef HAVE_TLS
 	      cupsSetEncryption(HTTP_ENCRYPT_REQUIRED);
 #else
-	      _cupsLangPrintf(stderr, _("%s: Sorry, no encryption support."), argv[0]);
-#endif /* HAVE_TLS */
+	      cupsLangPrintf(stderr, _("%s: Sorry, no encryption support."), argv[0]);
+#endif // HAVE_TLS
 	      break;
 
-	  case 'P' : /* Cancel jobs on a printer */
+	  case 'P' : // Cancel jobs on a printer
 	      if (opt[1] != '\0')
 	      {
 		name = opt + 1;
@@ -85,7 +84,7 @@ main(int  argc,			/* I - Number of command-line arguments */
 
 		if (i >= argc)
 		{
-		  _cupsLangPrintf(stderr, _("%s: Error - expected destination after \"-P\" option."), argv[0]);
+		  cupsLangPrintf(stderr, _("%s: Error - expected destination after \"-P\" option."), argv[0]);
 		  usage();
 		}
 
@@ -97,14 +96,14 @@ main(int  argc,			/* I - Number of command-line arguments */
 
 	      if ((dest = cupsGetNamedDest(CUPS_HTTP_DEFAULT, name, NULL)) == NULL)
 	      {
-		_cupsLangPrintf(stderr, _("%s: Error - unknown destination \"%s\"."), argv[0], name);
+		cupsLangPrintf(stderr, _("%s: Error - unknown destination \"%s\"."), argv[0], name);
 		goto error;
 	      }
 
 	      cupsFreeDests(1, dest);
 	      break;
 
-	  case 'U' : /* Username */
+	  case 'U' : // Username
 	      if (opt[1] != '\0')
 	      {
 		cupsSetUser(opt + 1);
@@ -115,7 +114,7 @@ main(int  argc,			/* I - Number of command-line arguments */
 		i ++;
 		if (i >= argc)
 		{
-		  _cupsLangPrintf(stderr, _("%s: Error - expected username after \"-U\" option."), argv[0]);
+		  cupsLangPrintf(stderr, _("%s: Error - expected username after \"-U\" option."), argv[0]);
 		  usage();
 		}
 
@@ -123,7 +122,7 @@ main(int  argc,			/* I - Number of command-line arguments */
 	      }
 	      break;
 
-	  case 'h' : /* Connect to host */
+	  case 'h' : // Connect to host
 	      if (opt[1] != '\0')
 	      {
 		cupsSetServer(opt + 1);
@@ -135,7 +134,7 @@ main(int  argc,			/* I - Number of command-line arguments */
 
 		if (i >= argc)
 		{
-		  _cupsLangPrintf(stderr, _("%s: Error - expected hostname after \"-h\" option."), argv[0]);
+		  cupsLangPrintf(stderr, _("%s: Error - expected hostname after \"-h\" option."), argv[0]);
 		  usage();
 		}
 		else
@@ -150,7 +149,7 @@ main(int  argc,			/* I - Number of command-line arguments */
 	      break;
 
 	  default :
-	      _cupsLangPrintf(stderr, _("%s: Error - unknown option \"%c\"."), argv[0], *opt);
+	      cupsLangPrintf(stderr, _("%s: Error - unknown option \"%c\"."), argv[0], *opt);
 	      usage();
 	}
       }
@@ -184,14 +183,14 @@ main(int  argc,			/* I - Number of command-line arguments */
       }
       else
       {
-	_cupsLangPrintf(stderr, _("%s: Error - unknown destination \"%s\"."),
+	cupsLangPrintf(stderr, _("%s: Error - unknown destination \"%s\"."),
 			argv[0], argv[i]);
 	goto error;
       }
 
       if (cupsCancelJob2(CUPS_HTTP_DEFAULT, name, job_id, 0) != IPP_OK)
       {
-        _cupsLangPrintf(stderr, "%s: %s", argv[0], cupsLastErrorString());
+        cupsLangPrintf(stderr, "%s: %s", argv[0], cupsGetErrorString());
 	goto error;
       }
 
@@ -206,7 +205,7 @@ main(int  argc,			/* I - Number of command-line arguments */
 
   if (!did_cancel && cupsCancelJob2(CUPS_HTTP_DEFAULT, name, 0, 0) != IPP_OK)
     {
-      _cupsLangPrintf(stderr, "%s: %s", argv[0], cupsLastErrorString());
+      cupsLangPrintf(stderr, "%s: %s", argv[0], cupsGetErrorString());
       goto error;
     }
 
@@ -228,21 +227,21 @@ main(int  argc,			/* I - Number of command-line arguments */
 }
 
 
-/*
- * 'usage()' - Show program usage and exit.
- */
+//
+// 'usage()' - Show program usage and exit.
+//
 
 static void
 usage(void)
 {
-  _cupsLangPuts(stdout, _("Usage: lprm [options] [id]\n"
+  cupsLangPuts(stdout, _("Usage: lprm [options] [id]\n"
                           "       lprm [options] -"));
-  _cupsLangPuts(stdout, _("Options:"));
-  _cupsLangPuts(stdout, _("-                       Cancel all jobs"));
-  _cupsLangPuts(stdout, _("-E                      Encrypt the connection to the server"));
-  _cupsLangPuts(stdout, _("-h server[:port]        Connect to the named server and port"));
-  _cupsLangPuts(stdout, _("-P destination          Specify the destination"));
-  _cupsLangPuts(stdout, _("-U username             Specify the username to use for authentication"));
+  cupsLangPuts(stdout, _("Options:"));
+  cupsLangPuts(stdout, _("-                       Cancel all jobs"));
+  cupsLangPuts(stdout, _("-E                      Encrypt the connection to the server"));
+  cupsLangPuts(stdout, _("-h server[:port]        Connect to the named server and port"));
+  cupsLangPuts(stdout, _("-P destination          Specify the destination"));
+  cupsLangPuts(stdout, _("-U username             Specify the username to use for authentication"));
 
   exit(1);
 }

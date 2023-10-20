@@ -1,22 +1,21 @@
-/*
- * "lpc" command for CUPS.
- *
- * Copyright 2007-2014 by Apple Inc.
- * Copyright 1997-2006 by Easy Software Products.
- *
- * Licensed under Apache License v2.0.  See the file "LICENSE" for more information.
- */
+//
+// "lpc" command for CUPS.
+//
+// Copyright © 2023 by OpenPrinting.
+// Copyright © 2007-2014 by Apple Inc.
+// Copyright © 1997-2006 by Easy Software Products.
+//
+// Licensed under Apache License v2.0.  See the file "LICENSE" for more
+// information.
+//
 
-/*
- * Include necessary headers...
- */
-
-#include <cups/cups-private.h>
+#include <config.h>
+#include <cups/cups.h>
 
 
-/*
- * Local functions...
- */
+//
+// Local functions...
+//
 
 static int	compare_strings(const char *, const char *, size_t);
 static void	do_command(http_t *, const char *, const char *);
@@ -25,26 +24,28 @@ static void	show_prompt(const char *message);
 static void	show_status(http_t *, const char *);
 
 
-/*
- * 'main()' - Parse options and commands.
- */
+//
+// 'main()' - Parse options and commands.
+//
 
 int
-main(int  argc,				/* I - Number of command-line arguments */
-     char *argv[])			/* I - Command-line arguments */
+main(int  argc,				// I - Number of command-line arguments
+     char *argv[])			// I - Command-line arguments
 {
-  http_t	*http;			/* Connection to server */
-  char		line[1024],		/* Input line from user */
-		*params;		/* Pointer to parameters */
+  http_t	*http;			// Connection to server
+  char		line[1024],		// Input line from user
+		*params;		// Pointer to parameters
 
 
-  _cupsSetLocale(argv);
+  // Setup localization...
+  cupsLangSetDirectory(CUPS_LOCAL_DATADIR);
+  cupsLangSetLocale(argv);
 
  /*
   * Connect to the scheduler...
   */
 
-  http = httpConnectEncrypt(cupsServer(), ippPort(), cupsEncryption());
+  http = httpConnectEncrypt(cupsGetServer(), ippGetPort(), cupsEncryption());
 
   if (argc > 1)
   {
@@ -138,16 +139,16 @@ main(int  argc,				/* I - Number of command-line arguments */
 }
 
 
-/*
- * 'compare_strings()' - Compare two command-line strings.
- */
+//
+// 'compare_strings()' - Compare two command-line strings.
+//
 
-static int				/* O - -1 or 1 = no match, 0 = match */
-compare_strings(const char *s,		/* I - Command-line string */
-                const char *t,		/* I - Option string */
-                size_t     tmin)	/* I - Minimum number of unique chars in option */
+static int				// O - -1 or 1 = no match, 0 = match
+compare_strings(const char *s,		// I - Command-line string
+                const char *t,		// I - Option string
+                size_t     tmin)	// I - Minimum number of unique chars in option
 {
-  size_t	slen;			/* Length of command-line string */
+  size_t	slen;			// Length of command-line string
 
 
   slen = strlen(s);
@@ -158,60 +159,60 @@ compare_strings(const char *s,		/* I - Command-line string */
 }
 
 
-/*
- * 'do_command()' - Do an lpc command...
- */
+//
+// 'do_command()' - Do an lpc command...
+//
 
 static void
-do_command(http_t     *http,		/* I - HTTP connection to server */
-           const char *command,		/* I - Command string */
-	   const char *params)		/* I - Parameters for command */
+do_command(http_t     *http,		// I - HTTP connection to server
+           const char *command,		// I - Command string
+	   const char *params)		// I - Parameters for command
 {
   if (!compare_strings(command, "status", 4))
     show_status(http, params);
   else if (!compare_strings(command, "help", 1) || !strcmp(command, "?"))
     show_help(params);
   else
-    _cupsLangPrintf(stdout,
+    cupsLangPrintf(stdout,
                     _("%s is not implemented by the CUPS version of lpc."),
 		    command);
 }
 
 
-/*
- * 'show_help()' - Show help messages.
- */
+//
+// 'show_help()' - Show help messages.
+//
 
 static void
-show_help(const char *command)		/* I - Command to describe or NULL */
+show_help(const char *command)		// I - Command to describe or NULL
 {
   if (!command)
   {
-    _cupsLangPrintf(stdout,
+    cupsLangPrintf(stdout,
                     _("Commands may be abbreviated.  Commands are:\n"
 		      "\n"
 		      "exit    help    quit    status  ?"));
   }
   else if (!compare_strings(command, "help", 1) || !strcmp(command, "?"))
-    _cupsLangPrintf(stdout, _("help\t\tGet help on commands."));
+    cupsLangPrintf(stdout, _("help\t\tGet help on commands."));
   else if (!compare_strings(command, "status", 4))
-    _cupsLangPrintf(stdout, _("status\t\tShow status of daemon and queue."));
+    cupsLangPrintf(stdout, _("status\t\tShow status of daemon and queue."));
   else
-    _cupsLangPrintf(stdout, _("?Invalid help command unknown."));
+    cupsLangPrintf(stdout, _("?Invalid help command unknown."));
 }
 
 
-/*
- * 'show_prompt()' - Show a localized prompt message.
- */
+//
+// 'show_prompt()' - Show a localized prompt message.
+//
 
 static void
-show_prompt(const char *message)	/* I - Message string to use */
+show_prompt(const char *message)	// I - Message string to use
 {
-  ssize_t	bytes;			/* Number of bytes formatted */
-  char		output[8192];		/* Message buffer */
+  ssize_t	bytes;			// Number of bytes formatted
+  char		output[8192];		// Message buffer
   cups_lang_t	*lang = cupsLangDefault();
-					/* Default language */
+					// Default language
 
  /*
   * Transcode to the destination charset and write the prompt...
@@ -225,27 +226,27 @@ show_prompt(const char *message)	/* I - Message string to use */
 }
 
 
-/*
- * 'show_status()' - Show printers.
- */
+//
+// 'show_status()' - Show printers.
+//
 
 static void
-show_status(http_t     *http,		/* I - HTTP connection to server */
-            const char *dests)		/* I - Destinations */
+show_status(http_t     *http,		// I - HTTP connection to server
+            const char *dests)		// I - Destinations
 {
-  ipp_t		*request,		/* IPP Request */
-		*response;		/* IPP Response */
-  ipp_attribute_t *attr;		/* Current attribute */
-  char		*printer,		/* Printer name */
-		*device,		/* Device URI */
-                *delimiter;		/* Char search result */
-  ipp_pstate_t	pstate;			/* Printer state */
-  int		accepting;		/* Is printer accepting jobs? */
-  int		jobcount;		/* Count of current jobs */
-  const char	*dptr,			/* Pointer into destination list */
-		*ptr;			/* Pointer into printer name */
-  int		match;			/* Non-zero if this job matches */
-  static const char *requested[] =	/* Requested attributes */
+  ipp_t		*request,		// IPP Request
+		*response;		// IPP Response
+  ipp_attribute_t *attr;		// Current attribute
+  char		*printer,		// Printer name
+		*device,		// Device URI
+                *delimiter;		// Char search result
+  ipp_pstate_t	pstate;			// Printer state
+  int		accepting;		// Is printer accepting jobs?
+  int		jobcount;		// Count of current jobs
+  const char	*dptr,			// Pointer into destination list
+		*ptr;			// Pointer into printer name
+  int		match;			// Non-zero if this job matches
+  static const char *requested[] =	// Requested attributes
 		{
 		  "device-uri",
 		  "printer-is-accepting-jobs",
@@ -372,7 +373,7 @@ show_status(http_t     *http,		/* I - HTTP connection to server */
 	  for (ptr = printer;
 	       *ptr != '\0' && *dptr != '\0' && *ptr == *dptr;
 	       ptr ++, dptr ++)
-	    /* do nothing */;
+	    // do nothing;
 
           if (*ptr == '\0' && (*dptr == '\0' || *dptr == ',' ||
 	                       isspace(*dptr & 255)))
@@ -407,7 +408,7 @@ show_status(http_t     *http,		/* I - HTTP connection to server */
 
         printf("%s:\n", printer);
 	if (!strncmp(device, "file:", 5))
-	  _cupsLangPrintf(stdout,
+	  cupsLangPrintf(stdout,
 	                  _("\tprinter is on device \'%s\' speed -1"),
 			  device + 5);
 	else
@@ -419,28 +420,28 @@ show_status(http_t     *http,		/* I - HTTP connection to server */
 	  if ((delimiter = strchr(device, ':')) != NULL )
 	  {
 	    *delimiter = '\0';
-	    _cupsLangPrintf(stdout,
+	    cupsLangPrintf(stdout,
 	                    _("\tprinter is on device \'%s\' speed -1"),
 			    device);
 	  }
 	}
 
         if (accepting)
-	  _cupsLangPuts(stdout, _("\tqueuing is enabled"));
+	  cupsLangPuts(stdout, _("\tqueuing is enabled"));
 	else
-	  _cupsLangPuts(stdout, _("\tqueuing is disabled"));
+	  cupsLangPuts(stdout, _("\tqueuing is disabled"));
 
         if (pstate != IPP_PRINTER_STOPPED)
-	  _cupsLangPuts(stdout, _("\tprinting is enabled"));
+	  cupsLangPuts(stdout, _("\tprinting is enabled"));
 	else
-	  _cupsLangPuts(stdout, _("\tprinting is disabled"));
+	  cupsLangPuts(stdout, _("\tprinting is disabled"));
 
 	if (jobcount == 0)
-	  _cupsLangPuts(stdout, _("\tno entries"));
+	  cupsLangPuts(stdout, _("\tno entries"));
 	else
-	  _cupsLangPrintf(stdout, _("\t%d entries"), jobcount);
+	  cupsLangPrintf(stdout, _("\t%d entries"), jobcount);
 
-	_cupsLangPuts(stdout, _("\tdaemon present"));
+	cupsLangPuts(stdout, _("\tdaemon present"));
       }
 
       if (attr == NULL)

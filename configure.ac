@@ -19,14 +19,14 @@ AC_PREREQ([2.70])
 
 
 dnl Package name and version...
-AC_INIT([cups_commands], [3.0b1], [https://github.com/OpenPrinting/cups-commands/issues], [cups-commands], [https://openprinting.github.io/cups])
+AC_INIT([cups_local], [3.0b1], [https://github.com/OpenPrinting/cups-local/issues], [cups-local], [https://openprinting.github.io/cups])
 AC_CONFIG_HEADERS([config.h])
 
-CUPS_VERSION="AC_PACKAGE_VERSION"
+CUPS_LOCAL_VERSION="AC_PACKAGE_VERSION"
 
-AC_SUBST([CUPS_VERSION])
+AC_SUBST([CUPS_LOCAL_VERSION])
 
-AC_DEFINE_UNQUOTED([CUPS_VERSION], ["$CUPS_VERSION"], [Version number])
+AC_DEFINE_UNQUOTED([CUPS_LOCAL_VERSION], ["$CUPS_LOCAL_VERSION"], [Version number])
 
 
 dnl This line is provided to ensure that you don't run the autoheader program
@@ -231,13 +231,37 @@ AC_ARG_WITH([ldflags], AS_HELP_STRING([--with-ldflags=...], [Specify additional 
     LDFLAGS="$withval $LDFLAGS"
 ])
 
-dnl State and run directories for root servers...
+dnl Fix prefix, datadir, and datarootdir...
 AS_IF([test "$prefix" = NONE], [
     # Default prefix isn't bound until AC_OUTPUT...
     realprefix="/usr/local"
 ], [
     realprefix="$prefix"
 ])
+
+AS_IF([test "$datarootdir" = "\${prefix}/share"], [
+    AS_IF([test "$prefix" = "/"], [
+	datarootdir="/usr/share"
+    ], [
+	datarootdir="$realprefix/share"
+    ])
+])
+
+AS_IF([test "$datadir" = "\${prefix}/share"], [
+    AS_IF([test "$prefix" = "/"], [
+	datadir="/usr/share"
+    ], [
+	datadir="$realprefix/share"
+    ])
+], [test "$datadir" = "\${datarootdir}"], [
+    datadir="$datarootdir"
+])
+
+
+dnl Save the installed directory for localizations...
+CUPS_LOCAL_DATADIR="$datadir/cups-local"
+AC_DEFINE_UNQUOTED([CUPS_LOCAL_DATADIR], ["$datadir/cups-local"], [Location of data files.])
+AC_SUBST([CUPS_LOCAL_DATADIR])
 
 
 dnl Generate a bunch of files...

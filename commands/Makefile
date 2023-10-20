@@ -125,7 +125,7 @@ uninstall:
 cancel:	cancel.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o cancel cancel.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
@@ -135,7 +135,7 @@ cancel:	cancel.o
 cupsaccept:	cupsaccept.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o cupsaccept cupsaccept.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 	for file in cupsenable cupsdisable cupsreject; do \
 		$(RM) $$file; \
 		$(LN) cupsaccept $$file; \
@@ -149,7 +149,7 @@ cupsaccept:	cupsaccept.o
 lp:	lp.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lp lp.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
@@ -159,7 +159,7 @@ lp:	lp.o
 lpadmin:	lpadmin.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lpadmin lpadmin.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
@@ -169,7 +169,7 @@ lpadmin:	lpadmin.o
 lpc:	lpc.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lpc lpc.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
@@ -179,7 +179,7 @@ lpc:	lpc.o
 lpmove:	lpmove.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lpmove lpmove.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
@@ -189,7 +189,7 @@ lpmove:	lpmove.o
 lpoptions:	lpoptions.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lpoptions lpoptions.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
@@ -199,7 +199,7 @@ lpoptions:	lpoptions.o
 lpq:	lpq.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lpq lpq.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
@@ -209,7 +209,7 @@ lpq:	lpq.o
 lpr:	lpr.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lpr lpr.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
@@ -219,7 +219,7 @@ lpr:	lpr.o
 lprm:	lprm.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lprm lprm.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
@@ -229,7 +229,7 @@ lprm:	lprm.o
 lpstat:	lpstat.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lpstat lpstat.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #

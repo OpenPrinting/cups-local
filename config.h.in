@@ -7,12 +7,16 @@
 // information.
 //
 
-#ifndef CUPS_COMMANDS_CONFIG_H
-#define CUPS_COMMANDS_CONFIG_H
+#ifndef CUPS_LOCAL_CONFIG_H
+#define CUPS_LOCAL_CONFIG_H
 
 
 // Version number
-#define CUPS_VERSION ""
+#define CUPS_LOCAL_VERSION ""
+
+
+// Data directory
+#define CUPS_LOCAL_DATADIR ""
 
 
 // Do we have D-Bus?
@@ -27,4 +31,8 @@
 #undef HAVE_DBUS_THREADS_INIT
 
 
-#endif // !CUPS_COMMANDS_CONFIG_H
+// Localization strings macro
+#define _(x) x
+
+
+#endif // !CUPS_LOCAL_CONFIG_H
