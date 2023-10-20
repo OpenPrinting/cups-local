@@ -3819,14 +3819,20 @@ printf "%s\n" "no" >&6; }
 fi
 
 
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for PAPPL library v2.0 or later" >&5
+printf %s "checking for PAPPL library v2.0 or later... " >&6; }
 if $PKGCONFIG --exists pappl --atleast-version=2.0
 then :
 
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
     CPPFLAGS="$CFLAGS $($PKGCONFIG --cflags pappl)"
     LIBS="$LIBS $($PKGCONFIG --libs pappl)"
 
 else $as_nop
 
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
     as_fn_error $? "PAPPL v2.0 or later is required." "$LINENO" 5
 
 fi

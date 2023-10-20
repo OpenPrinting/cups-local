@@ -80,20 +80,23 @@ AC_PATH_TOOL([PKGCONFIG], [pkg-config])
 dnl CUPS library v3
 AC_MSG_CHECKING([for CUPS library v3])
 AS_IF([$PKGCONFIG --exists cups3], [
-    AC_MSG_RESULT(yes)
+    AC_MSG_RESULT([yes])
     CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags cups3)"
     LIBS="$LIBS $($PKGCONFIG --libs cups3)"
 ], [
-    AC_MSG_RESULT(no)
+    AC_MSG_RESULT([no])
     AC_MSG_ERROR([CUPS library v3.0 or later is required.])
 ])
 
 
 dnl PAPPL library...
+AC_MSG_CHECKING([for PAPPL library v2.0 or later])
 AS_IF([$PKGCONFIG --exists pappl --atleast-version=2.0], [
+    AC_MSG_RESULT([yes])
     CPPFLAGS="$CFLAGS $($PKGCONFIG --cflags pappl)"
     LIBS="$LIBS $($PKGCONFIG --libs pappl)"
 ], [
+    AC_MSG_RESULT([no])
     AC_MSG_ERROR([PAPPL v2.0 or later is required.])
 ])
 

@@ -18,11 +18,10 @@
 // Local functions.
 //
 
-static cups_dest_t	*get_dest(const char *command, const char *printer, const char *instance, cups_dinfo_t *dinfo);
-static int		print_files(const char *command, cups_dest_t *dest, cups_dinfo_t *dinfo, size_t num_files, const char **files, const char *title, size_t num_options, cups_option_t *options);
-static int		restart_job(const char *command, int job_id, const char *job_hold_until);
-static int		send_document(const char *command, cups_dest_t *dest, cups_dinfo_t *dinfo, int job_id, const char *format, bool last_document, int fd);
-static int		set_job_attrs(const char *command, int job_id, int num_options, cups_option_t *options);
+static http_t		*connect_dest(const char *command, const char *printer, const char *instance, cupst_dest_t *dest, cups_dinfo_t *dinfo, char *resource, size_t resourcesize);
+static int		print_files(const char *command, http_t *http, cups_dest_t *dest, cups_dinfo_t *dinfo, size_t num_files, const char **files, const char *title, size_t num_options, cups_option_t *options);
+static int		send_document(const char *command, http_t *http, cups_dest_t *dest, cups_dinfo_t *dinfo, int job_id, const char *docname, const char *format, bool last_document, int fd);
+static int		set_job_attrs(const char *command, http_t *http, cups_dest_t *dest, cups_dinfo_t *dinfo, const char *resource, int job_id, int num_options, cups_option_t *options);
 static int		usage(FILE *out, const char *command);
 
 
@@ -41,18 +40,22 @@ main(int  argc,				// I - Number of command-line arguments
 		*instance = NULL,	// Instance name
 		*opt,			// Option pointer
 		*val,			// Option value
-		*title = NULL;		// Job title
+		*ptr,			// Pointer into value
+		*title = NULL,		// Job title
+		email[1024];		// EMail address
   int		priority;		// Job priority (1-100)
   int		num_copies;		// Number of copies per file
   size_t	num_files = 0;		// Number of files to print
   const char	*files[1000];		// Files to print
+  http_t	*http = NULL;		// HTTP connection
   cups_dest_t	*dest = NULL;		// Selected destination
   cups_dinfo_t	*dinfo = NULL;		// Destination information
+  char		resource[1024];		// Resource path for printer
   size_t	num_options = 0;	// Number of options
   cups_option_t	*options = NULL;	// Options
-  bool		end_options = false;	// No more options?
-  bool		silent = false;		// Silent or verbose output?
-  char		buffer[8192];		// Copy buffer
+  bool		end_options = false,	// No more options?
+		silent = false,		// Silent or verbose output?
+		deletefile = false;	// Delete file after submission?
 
 
   // Get command name...
@@ -79,7 +82,7 @@ main(int  argc,				// I - Number of command-line arguments
     }
     else if (!strncmp(argv[i], "--", 2) && argv[i][2])
     {
-      cupsLangPrintf(stderr, _("%s: Error - unknown option \"%s\"."), command, argv[i]);
+      cupsLangPrintf(stderr, _("%s: Unknown option \"%s\"."), command, argv[i]);
       return (usage(stderr, command));
     }
     else if (argv[i][0] == '-' && argv[i][1] && !end_options)
@@ -88,11 +91,44 @@ main(int  argc,				// I - Number of command-line arguments
       {
         switch (*opt)
 	{
-	  case 'E' : // Encrypt
+	  case '-' : // --         Stop processing options
+	      end_options = true;
+	      break;
+
+	  case 'c' : // Copy to spool dir (always enabled)
+	      break;
+
+	  case 'd' : // -d DESTINATION
+	      if (opt[1] != '\0')
+	      {
+		printer = opt + 1;
+		opt += strlen(opt) - 1;
+	      }
+	      else
+	      {
+		i ++;
+
+		if (i >= argc)
+		{
+		  cupsLangPrintf(stderr, _("%s: Expected destination after \"-d\" option."), command);
+		  return (usage(stderr, command));
+		}
+
+		printer = argv[i];
+	      }
+
+	      if ((instance = strrchr(printer, '/')) != NULL)
+		*instance++ = '\0';
+
+              if ((http = connect_dest(command, printer, instance, &dest, &dinfo, resource, sizeof(resource))) == NULL)
+                return (1);
+	      break;
+
+	  case 'E' : // -E         Encrypt
 	      cupsSetEncryption(HTTP_ENCRYPTION_REQUIRED);
 	      break;
 
-	  case 'H' : // Destination host
+	  case 'H' : // -H SERVER  Destination host
 	      if (opt[1] != '\0')
 	      {
 		cupsSetServer(opt + 1);
@@ -104,11 +140,115 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected hostname after \"-H\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected server after \"-H\" option."), command);
 		  return (usage(stderr, command));
 		}
 
 		cupsSetServer(argv[i]);
+	      }
+	      break;
+
+	  case 'i' : // -i JOBID   Change job
+	      if (opt[1] != '\0')
+	      {
+		val = opt + 1;
+		opt += strlen(opt) - 1;
+	      }
+	      else
+	      {
+		i ++;
+
+		if (i >= argc)
+		{
+		  cupsLangPrintf(stderr, _("%s: Expected job ID after \"-i\" option."), command);
+		  return (usage(stderr, command));
+		}
+
+		val = argv[i];
+	      }
+
+	      if (num_files > 0)
+	      {
+		cupsLangPrintf(stderr, _("%s: Cannot print files and alter jobs simultaneously."), command);
+		return (1);
+	      }
+
+	      if ((ptr = strrchr(val, '-')) != NULL)
+	      {
+	        *ptr++ = '\0'
+		job_id = atoi(ptr);
+
+                printer = val;
+		if ((instance = strrchr(printer, '/')) != NULL)
+		  *instance++ = '\0';
+
+		if ((http = connect_dest(command, printer, instance, &dest, &dinfo, resource, sizeof(resource))) == NULL)
+	      }
+	      else
+	      {
+		job_id = atoi(val);
+	      }
+
+	      if (job_id < 0)
+	      {
+		cupsLangPrintf(stderr, _("%s: Bad job ID."), command);
+		break;
+	      }
+	      break;
+
+	  case 'm' : // -m         Send email when job is done
+	      snprintf(email, sizeof(email), "mailto:%s@%s", cupsGetUser(), httpGetHostname(NULL, buffer, sizeof(buffer)));
+	      num_options = cupsAddOption("notify-recipient-uri", email, num_options, &options);
+
+	      silent = true;
+	      break;
+
+	  case '#' : // -# COPIES  Set number of copies
+	  case 'n' : // -n COPIES  Set number of copies
+	      if (opt[1] != '\0')
+	      {
+		num_copies = atoi(opt + 1);
+		opt += strlen(opt) - 1;
+	      }
+	      else
+	      {
+		i ++;
+
+		if (i >= argc)
+		{
+		  cupsLangPrintf(stderr, _("%s: Expected copies after \"-n\" option."), command);
+		  return (usage(stderr, command));
+		}
+
+		num_copies = atoi(argv[i]);
+	      }
+
+	      if (num_copies < 1)
+	      {
+		cupsLangPrintf(stderr, _("%s: Copies must be 1 or more."), command);
+		return (1);
+	      }
+
+	      num_options = cupsAddIntegerOption("copies", num_copies, num_options, &options);
+	      break;
+
+	  case 'o' : // Option
+	      if (opt[1] != '\0')
+	      {
+		num_options = cupsParseOptions(opt + 1, num_options, &options);
+		opt += strlen(opt) - 1;
+	      }
+	      else
+	      {
+		i ++;
+
+		if (i >= argc)
+		{
+		  cupsLangPrintf(stderr, _("%s: Expected option=value after \"-o\" option."), command);
+		  return (usage(stderr, command));
+		}
+
+		num_options = cupsParseOptions(argv[i], num_options, &options);
 	      }
 	      break;
 
@@ -127,7 +267,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		  if (i >= argc)
 		  {
-		    cupsLangPrintf(stderr, _("%s: Error - expected page list after \"-P\" option."), command);
+		    cupsLangPrintf(stderr, _("%s: Expected page list after \"-P\" option."), command);
 		    return (usage(stderr, command));
 		  }
 
@@ -150,7 +290,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		  if (i >= argc)
 		  {
-		    cupsLangPrintf(stderr, _("%s: Error - expected destination after \"-d\" option."), command);
+		    cupsLangPrintf(stderr, _("%s: Expected destination after \"-d\" option."), command);
 		    return (usage(stderr, command));
 		  }
 
@@ -160,8 +300,65 @@ main(int  argc,				// I - Number of command-line arguments
 		if ((instance = strrchr(printer, '/')) != NULL)
 		  *instance++ = '\0';
 
-		if ((dest = get_dest(printer, instance, &dinfo)) == NULL)
+		if ((http = connect_dest(command, printer, instance, &dest, &dinfo, resource, sizeof(resource))) == NULL)
 		  return (1);
+	      }
+	      break;
+
+	  case 'q' : // Queue priority
+	      if (opt[1] != '\0')
+	      {
+		priority = atoi(opt + 1);
+		opt += strlen(opt) - 1;
+	      }
+	      else
+	      {
+		if ((i + 1) >= argc)
+		{
+		  cupsLangPrintf(stderr, _("%s: Expected priority after \"-%c\" option."), command, *opt);
+		  return (usage(stderr, command));
+		}
+
+		i ++;
+
+		priority = atoi(argv[i]);
+	      }
+
+	      if (priority < 1 || priority > 100)
+	      {
+		cupsLangPrintf(stderr, _("%s: Priority must be between 1 and 100."), command);
+		return (1);
+	      }
+
+	      num_options = cupsAddIntegerOption("job-priority", priority, num_options, &options);
+	      break;
+
+	  case 'r' : // Remove file after printing
+	      deletefile = 1;
+	      break;
+
+	  case 's' : // Silent
+	      silent = true;
+	      break;
+
+	  case 'T' : // -T TITLE   Set job name
+	  case 't' : // -t TITLE   Set job name
+	      if (opt[1] != '\0')
+	      {
+		title = opt + 1;
+		opt += strlen(opt) - 1;
+	      }
+	      else
+	      {
+		i ++;
+
+		if (i >= argc)
+		{
+		  cupsLangPrintf(stderr, _("%s: Expected title after \"-t\" option."), command);
+		  return (usage(stderr, command));
+		}
+
+		title = argv[i];
 	      }
 	      break;
 
@@ -176,7 +373,7 @@ main(int  argc,				// I - Number of command-line arguments
 		i ++;
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected username after \"-U\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected username after \"-U\" option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -184,211 +381,8 @@ main(int  argc,				// I - Number of command-line arguments
 	      }
 	      break;
 
-	  case 'c' : // Copy to spool dir (always enabled)
-	      break;
-
-	  case 'd' : // -d DESTINATION
-	      if (opt[1] != '\0')
-	      {
-		printer = opt + 1;
-		opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		i ++;
-
-		if (i >= argc)
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected destination after \"-d\" option."), command);
-		  return (usage(stderr, command));
-		}
-
-		printer = argv[i];
-	      }
-
-	      if ((instance = strrchr(printer, '/')) != NULL)
-		*instance++ = '\0';
-
-              if ((dest = get_dest(printer, instance, &dinfo)) == NULL)
-                return (1);
-	      break;
-
-	  case 'i' : // Change job
-	      if (opt[1] != '\0')
-	      {
-		val = opt + 1;
-		opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		i ++;
-
-		if (i >= argc)
-		{
-		  cupsLangPrintf(stderr, _("%s: Expected job ID after \"-i\" option."), command);
-		  return (usage(stderr, command));
-		}
-
-		val = argv[i];
-	      }
-
-	      if (num_files > 0)
-	      {
-		cupsLangPrintf(stderr, _("%s: Error - cannot print files and alter jobs simultaneously."), command);
-		return (1);
-	      }
-
-	      if (strrchr(val, '-') != NULL)
-		job_id = atoi(strrchr(val, '-') + 1);
-	      else
-		job_id = atoi(val);
-
-	      if (job_id < 0)
-	      {
-		cupsLangPrintf(stderr, _("%s: Error - bad job ID."), command);
-		break;
-	      }
-	      break;
-
-	  case 'm' : // Send email when job is done
-	  case 'w' : // Write to console or email
-	      {
-		char	email[1024];	// EMail address
-
-
-		snprintf(email, sizeof(email), "mailto:%s@%s", cupsGetUser(), httpGetHostname(NULL, buffer, sizeof(buffer)));
-		num_options = cupsAddOption("notify-recipient-uri", email, num_options, &options);
-	      }
-
-	      silent = true;
-	      break;
-
-	  case 'n' : // Number of copies
-	      if (opt[1] != '\0')
-	      {
-		num_copies = atoi(opt + 1);
-		opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		i ++;
-
-		if (i >= argc)
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected copies after \"-n\" option."), command);
-		  return (usage(stderr, command));
-		}
-
-		num_copies = atoi(argv[i]);
-	      }
-
-	      if (num_copies < 1)
-	      {
-		cupsLangPrintf(stderr, _("%s: Error - copies must be 1 or more."), command);
-		return (1);
-	      }
-
-	      num_options = cupsAddIntegerOption("copies", num_copies, num_options, &options);
-	      break;
-
-	  case 'o' : // Option
-	      if (opt[1] != '\0')
-	      {
-		num_options = cupsParseOptions(opt + 1, num_options, &options);
-		opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		i ++;
-
-		if (i >= argc)
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected option=value after \"-o\" option."), command);
-		  return (usage(stderr, command));
-		}
-
-		num_options = cupsParseOptions(argv[i], num_options, &options);
-	      }
-	      break;
-
-	  case 'q' : // Queue priority
-	      if (opt[1] != '\0')
-	      {
-		priority = atoi(opt + 1);
-		opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		if ((i + 1) >= argc)
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected priority after \"-%c\" option."), command, *opt);
-		  return (usage(stderr, command));
-		}
-
-		i ++;
-
-		priority = atoi(argv[i]);
-	      }
-
-	      if (priority < 1 || priority > 100)
-	      {
-		cupsLangPrintf(stderr, _("%s: Error - priority must be between 1 and 100."), command);
-		return (1);
-	      }
-
-	      num_options = cupsAddIntegerOption("job-priority", priority, num_options, &options);
-	      break;
-
-	  case 's' : // Silent
-	      silent = true;
-	      break;
-
-	  case 't' : // Title
-	      if (opt[1] != '\0')
-	      {
-		title = opt + 1;
-		opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		i ++;
-
-		if (i >= argc)
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected title after \"-t\" option."), command);
-		  return (usage(stderr, command));
-		}
-
-		title = argv[i];
-	      }
-	      break;
-
-	  case 'y' : // mode-list
-	      if (opt[1] != '\0')
-	      {
-		opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		i ++;
-
-		if (i >= argc)
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected mode list after \"-y\" option."), command);
-		  return (usage(stderr, command));
-		}
-	      }
-
-	      cupsLangPrintf(stderr, _("%s: Warning - mode option ignored."), command);
-	      break;
-
-
-	  case '-' : // Stop processing options
-	      end_options = true;
-	      break;
-
 	  default :
-	      cupsLangPrintf(stderr, _("%s: Error - unknown option \"%c\"."), command, *opt);
+	      cupsLangPrintf(stderr, _("%s: Unknown option \"%c\"."), command, *opt);
 	      return (usage(stderr, command));
 	}
       }
@@ -397,7 +391,7 @@ main(int  argc,				// I - Number of command-line arguments
     {
       if (num_files || job_id)
       {
-        cupsLangPrintf(stderr, _("%s: Error - cannot print from stdin if files or a job ID are provided."), command);
+        cupsLangPrintf(stderr, _("%s: Cannot print from stdin if files or a job ID are provided."), command);
 	return (1);
       }
 
@@ -408,7 +402,7 @@ main(int  argc,				// I - Number of command-line arguments
       // Print a file...
       if (access(argv[i], R_OK) != 0)
       {
-        cupsLangPrintf(stderr, _("%s: Error - unable to access \"%s\" - %s"), command, argv[i], strerror(errno));
+        cupsLangPrintf(stderr, _("%s: Unable to access '%s' - %s"), command, argv[i], strerror(errno));
         return (1);
       }
 
@@ -425,132 +419,99 @@ main(int  argc,				// I - Number of command-line arguments
     }
     else
     {
-      cupsLangPrintf(stderr, _("%s: Error - too many files - \"%s\"."), command, argv[i]);
+      cupsLangPrintf(stderr, _("%s: Too many files."), command);
     }
   }
 
-  // See if we are altering an existing job...
-  if (job_id)
-    return (set_job_attrs(command, job_id, num_options, options));
-
-  // See if we have any files to print; if not, print from stdin...
-  if (printer == NULL)
+  // Make sure we have a destination...
+  if (!http)
   {
-    if ((dest = cupsGetNamedDest(CUPS_HTTP_DEFAULT, NULL, NULL)) != NULL)
-    {
-      printer = dest->name;
-
-      for (j = 0; j < dest->num_options; j ++)
-      {
-	if (cupsGetOption(dest->options[j].name, num_options, options) == NULL)
-	  num_options = cupsAddOption(dest->options[j].name, dest->options[j].value, num_options, &options);
-      }
-    }
-    else if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST || cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
-    {
-      cupsLangPrintf(stderr, _("%s: Error - add '/version=1.1' to server  name."), command);
+    if ((http = connect_dest(command, /*printer*/NULL, /*instance*/NULL, &dest, &dinfo, resource, sizeof(resource))) == NULL)
       return (1);
-    }
   }
 
-  if (printer == NULL)
+  // Process things...
+  if (job_id)
   {
-    if (!cupsGetNamedDest(CUPS_HTTP_DEFAULT, NULL, NULL) && cupsGetError() == IPP_STATUS_ERROR_NOT_FOUND)
-      cupsLangPrintf(stderr, _("%s: Error - %s"), command, cupsGetErrorString());
-    else
-      cupsLangPrintf(stderr, _("%s: Error - scheduler not responding."), command);
-
-    return (1);
+    // Update options for an existing job...
+    return (set_job_attrs(command, http, dest, dinfo, resource, job_id, num_options, options));
   }
-
-  if (num_files > 0)
+  else if (num_files > 0)
   {
-    job_id = cupsPrintFiles(printer, num_files, files, title, num_options, options);
+    job_id = print_files(command, http, dest, dinfo, num_files, files, title, num_options, options);
   }
-  else if ((job_id = cupsCreateJob(CUPS_HTTP_DEFAULT, printer, title ? title : "(stdin)", num_options, options)) > 0)
+  else if ((job_id = cupsCreateDestJob(http, dest, dinfo, title ? title : "(stdin)", num_options, options)) == 0)
   {
-    http_status_t	status;		// Write status
-    const char		*format;	// Document format
-    ssize_t		bytes;		// Bytes read
+    cupsLangPrintf(stderr, _("%s: Unable to create job: %s"), command, cupsGetErrorString());
+  }
+  else
+  {
+    const char	*format;		// Document format
 
     if (cupsGetOption("raw", num_options, options))
       format = CUPS_FORMAT_RAW;
     else if ((format = cupsGetOption("document-format", num_options, options)) == NULL)
       format = CUPS_FORMAT_AUTO;
 
-    status = cupsStartDocument(CUPS_HTTP_DEFAULT, printer, job_id, NULL, format, 1);
-
-    while (status == HTTP_STATUS_CONTINUE && (bytes = read(0, buffer, sizeof(buffer))) > 0)
-      status = cupsWriteRequestData(CUPS_HTTP_DEFAULT, buffer, (size_t)bytes);
-
-    if (status != HTTP_STATUS_CONTINUE)
-    {
-      cupsLangPrintf(stderr, _("%s: Error - unable to queue from stdin - %s."), command, httpStatus(status));
-      cupsFinishDocument(CUPS_HTTP_DEFAULT, printer);
-      cupsCancelJob2(CUPS_HTTP_DEFAULT, printer, job_id, 0);
-      return (1);
-    }
-
-    if (cupsFinishDocument(CUPS_HTTP_DEFAULT, printer) != IPP_STATUS_OK)
-    {
-      cupsLangPrintf(stderr, "%s: %s", command, cupsGetErrorString());
-      cupsCancelJob2(CUPS_HTTP_DEFAULT, printer, job_id, 0);
-      return (1);
-    }
+    if (send_document(command, http, dest, dinfo, resource, job_id, /*docname*/NULL, format, /*last_document*/true, 0))
+      job_id = 0;
   }
 
-  if (job_id < 1)
-  {
-    cupsLangPrintf(stderr, "%s: %s", command, cupsGetErrorString());
-    return (1);
-  }
-  else if (!silent)
-  {
-    cupsLangPrintf(stdout, _("request id is %s-%d (%d file(s))"), printer, job_id, num_files);
-  }
+  if (job_id > 0 && !silent)
+    cupsLangPrintf(stdout, _("request id is %s-%d (%d file(s))"), dest->name, job_id, (int)num_files);
 
-  return (0);
+  return (job_id ? 0 : 1);
 }
 
 
 //
-// 'get_dest()' - Get the named destination and its information.
+// 'connect_dest()' - Connect to the named destination and get its information.
 //
 
-static cups_dest_t *			// O - Destination or `NULL` on error
-get_dest(const char   *command,		// I - Command name
-         const char   *printer,		// I - Printer name
-         const char   *instance,	// I - Instance name
-         cups_dinfo_t *dinfo)		// O - Destination information or `NULL`
+static http_t *				// O - HTTP connection or `NULL` on error
+connect_dest(const char   *command,	// I - Command name
+             const char   *printer,	// I - Printer or `NULL` for default
+             const char   *instance,	// I - Instance or `NULL` for primary
+             cups_dest_t  *dest,	// O - Destination or `NULL` on error
+             cups_dinfo_t *dinfo,	// O - Destination information or `NULL` on error
+             char         *resource,	// I - Resource buffer
+             size_t       resourcesize)	// I - Size of resource buffer
 {
-  cups_dest_t	*dest;			// Destination
+  http_t	*http = NULL;		// HTTP connection
 
 
   // Try to find the destination...
-  if ((dest = cupsGetNamedDest(CUPS_HTTP_DEFAULT, printer, instance)) == NULL)
+  *dinfo = NULL;
+
+  if ((*dest = cupsGetNamedDest(CUPS_HTTP_DEFAULT, printer, instance)) == NULL)
   {
     // Destination doesn't exist...
-    *dinfo = NULL;
-
     if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST || cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
-      cupsLangPrintf(stderr, _("%s: Error - try adding '/version=1.1' to server name."), command);
+      cupsLangPrintf(stderr, _("%s: Try adding '/version=1.1' to server name."), command);
     else if (cupsGetError() == IPP_STATUS_ERROR_NOT_FOUND)
-      cupsLangPrintf(stderr, _("%s: Error - The printer or class does not exist."), command);
+      cupsLangPrintf(stderr, _("%s: The printer or class does not exist."), command);
     else
       cupsLangPrintf(stderr, _("%s: %s"), command, cupsGetErrorString());
-
-    return (NULL);
   }
-
-  // Get the destination info...
-  if ((dinfo = cupsCopyDestInfo(CUPS_HTTP_DEFAULT, dest)) == NULL)
+  else if ((http = cupsConnectDest(*dest, CUPS_DEST_FLAGS_NONE, 30000, /*cancel*/NULL, resource, resourcesize, /*cb*/NULL, /*user_data*/NULL)) == NULL)
   {
-    cupsLangPrintf(stderr, _("%s: %s"), command, cupsGetErrorString());
-    cupsFreeDests(1, dest);
-    dest = NULL;
+    cupsLangPrintf(stderr, _("%s: Unable to connect to '%s' - %s"), command, (*dest)->name, cupsGetErrorString());
+
+    cupsFreeDests(1, *dest);
+    *dest = NULL;
+  }
+  else if ((*dinfo = cupsCopyDestInfo(http, *dest)) == NULL)
+  {
+    cupsLangPrintf(stderr, _("%s: Unable to get information on '%s' - %s"), command, (*dest)->name, cupsGetErrorString());
+
+    cupsFreeDests(1, *dest);
+    *dest = NULL;
+
+    httpClose(http);
+    http = NULL;
   }
 
-  return (dest);
+  return (http);
 }
 
 
@@ -558,56 +519,57 @@ get_dest(const char   *command,		// I - Command name
 // 'print_files()' - Print one or more files to the specified destination...
 //
 
-static int				// O - Exit status
-print_files(cups_dest_t   *dest,	// I - Destination
+static int				// O - Job ID or 0 on error
+print_files(const char    *command,	// I - Command name
+            http_t        *http,	// I - HTTP connection
+            cups_dest_t   *dest,	// I - Destination
+            cups_dinfo_t  *dinfo,	// I - Destination info
             size_t        num_files,	// I - Number of files
             const char    **files,	// I - Files
             const char    *title,	// I - Title
             size_t        num_options,	// I - Number of options
             cups_option_t *options)	// I - Options
 {
-  cups_dinfo_t	*dinfo;			// Destination information
-}
+  size_t	i;			// Looping var...
+  int		job_id;			// Job ID
 
 
-//
-// 'restart_job()' - Restart a job.
-//
-
-static int				// O - Exit status
-restart_job(const char *command,	// I - Command name
-            int        job_id,		// I - Job ID
-            const char *job_hold_until)	// I - "job-hold-until" value, if any
-{
-  ipp_t		*request;		// IPP request
-  char		uri[HTTP_MAX_URI];	// URI for job
-
-
-  // TODO: Fix job-uri
-  request = ippNewRequest(IPP_RESTART_JOB);
-
-  snprintf(uri, sizeof(uri), "ipp://localhost/jobs/%d", job_id);
-  ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "job-uri", NULL, uri);
-  ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name", NULL, cupsGetUser());
-
-  if (job_hold_until)
-    ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_KEYWORD, "job-hold-until", NULL, job_hold_until);
-
-  // TODO: Fix resource path
-  ippDelete(cupsDoRequest(CUPS_HTTP_DEFAULT, request, "/jobs"));
-
-  if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST || cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
+  if ((job_id = cupsCreateDestJob(http, dest, dinfo, title, num_options, options)) == 0)
   {
-    cupsLangPrintf(stderr, _("%s: Error - add '/version=1.1' to server name."), command);
-    return (1);
-  }
-  else if (cupsGetError() > IPP_STATUS_OK_CONFLICTING)
-  {
-    cupsLangPrintf(stderr, _("%s: %s"), command, cupsGetErrorString());
-    return (1);
+    cupsLangPrintf(stderr, _("%s: Unable to create job: %s"), command, cupsGetErrorString());
+    return (0);
   }
 
-  return (0);
+  for (i = 0; i < num_files; i ++)
+  {
+    int		fd;			// Print file
+    const char	*docname;		// Document name
+    int		status;			// Send status
+
+    if ((fd = open(files[i], O_RDONLY)) < 0)
+    {
+      cupsLangPrintf(stderr, _("%s: Unable to open '%s': %s"), command, files[i], strerror(errno));
+      cupsCancelDestJob(http, dest, dinfo, job_id);
+      return (0);
+    }
+
+    if ((docname = strrchr(files[i], '/')) != NULL)
+      docname ++;
+    else
+      docname = files[i];
+
+    status = send_document(command, http, dest, dinfo, job_id, docname, cupsGetOption("document-format", num_options, options), i == (num_files - 1), fd);
+
+    close(fd);
+
+    if (status)
+    {
+      cupsCancelDestJob(http, dest, dinfo, job_id);
+      return (0);
+    }
+  }
+
+  return (job_id);
 }
 
 
@@ -618,13 +580,44 @@ restart_job(const char *command,	// I - Command name
 static int				// O - Exit status
 send_document(
     const char   *command,		// I - Command name
+    http_t       *http,			// I - HTTP connection
     cups_dest_t  *dest,			// I - Destination
     cups_dinfo_t *dinfo,		// I - Destination info
     int          job_id,		// I - Job ID
+    const char   *docname,		// I - Document name
     const char   *format,		// I - File format
     bool         last_document,		// I - Is this the last document?
     int          fd)			// I - File to send
 {
+  http_status_t	status;			// Write status
+  char		buffer[8192];		// Copy buffer
+  ssize_t	bytes;			// Bytes read
+
+
+  // Start sending another document...
+  status = cupsStartDestDocument(http, dest, dinfo, job_id, docname, format, /*num_options*/0, /*options*/NULL, last_document);
+
+  // Copy the document to the job...
+  while (status == HTTP_STATUS_CONTINUE && (bytes = read(fd, buffer, sizeof(buffer))) > 0)
+    status = cupsWriteRequestData(http, buffer, (size_t)bytes);
+
+  // Finish up...
+  if (status != HTTP_STATUS_CONTINUE)
+  {
+    cupsLangPrintf(stderr, _("%s: Unable to spool document file."), command);
+    cupsFinishDestDocument(http, dest, dinfo);
+    cupsCancelDestJob(http, dest, dinfo, job_id);
+    return (1);
+  }
+
+  if (cupsFinishDestDocument(http, dest, dinfo) >= IPP_STATUS_ERROR_BAD_REQUEST)
+  {
+    cupsLangPrintf(stderr, _("%s: %s"), command, cupsGetErrorString());
+    cupsCancelDestJob(http, dest, dinfo, job_id);
+    return (1);
+  }
+
+  return (0);
 }
 
 
@@ -635,12 +628,15 @@ send_document(
 static int				// O - Exit status
 set_job_attrs(
     const char    *command,		// I - Command name
+    http_t        *http,		// I - HTTP connection
+    cups_dest_t   *dest,		// I - Destination
+    cups_dinfo_t  *dinfo,		// I - Destination info
+    const char    *resource,		// I - Resource path
     int           job_id,		// I - Job ID
     int           num_options,		// I - Number of options
     cups_option_t *options)		// I - Options
 {
-  ipp_t		*request;		// IPP request
-  char		uri[HTTP_MAX_URI];	// URI for job
+  ipp_t	*request;			// IPP request
 
 
   if (num_options == 0)
@@ -648,18 +644,17 @@ set_job_attrs(
 
   request = ippNewRequest(IPP_SET_JOB_ATTRIBUTES);
 
-  // TODO: Fix job-uri
-  snprintf(uri, sizeof(uri), "ipp://localhost/jobs/%d", job_id);
-  ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "job-uri", NULL, uri);
+  ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, cupsGetOption("printer-uri-supported", dest->num_options, dest->options));
+  ippAddInteger(request, IPP_TAG_OPERATION, IPP_TAG_INTEGER, "job-id", job_id);
   ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name", NULL, cupsGetUser());
-  cupsEncodeOptions(request, num_options, options);
+  cupsEncodeOptions(request, num_options, options, IPP_TAG_OPERATION);
+  cupsEncodeOptions(request, num_options, options, IPP_TAG_JOB);
 
-  // TODO: Fix resource path
-  ippDelete(cupsDoRequest(CUPS_HTTP_DEFAULT, request, "/jobs"));
+  ippDelete(cupsDoRequest(http, request, resource));
 
   if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST || cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
   {
-    cupsLangPrintf(stderr, _("%s: Error - add '/version=1.1' to server name."), command);
+    cupsLangPrintf(stderr, _("%s: Add '/version=1.1' to server name."), command);
     return (1);
   }
   else if (cupsGetError() > IPP_STATUS_OK_CONFLICTING)

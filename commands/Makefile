@@ -19,8 +19,6 @@ TARGETS	=	\
 		lpmove \
 		lpoptions \
 		lpq \
-		lpr \
-		lprm \
 		lpstat
 OBJS	=	\
 		cancel.o \
@@ -31,8 +29,6 @@ OBJS	=	\
 		lpmove.o \
 		lpoptions.o \
 		lpq.o \
-		lpr.o \
-		lprm.o \
 		lpstat.o
 
 
@@ -56,7 +52,7 @@ test:
 
 clean:
 	$(RM) $(OBJS) $(TARGETS)
-	$(RM) cupsdisable cupsenable cupsreject
+	$(RM) cupsdisable cupsenable cupsreject lpr lprm
 
 
 #
@@ -72,6 +68,17 @@ depend:
 #
 
 install:
+	echo Installing user commands tp $(BUILDROOT)$(bindir)
+	$(INSTALL_DIR) -m 755 $(BUILDROOT)$(bindir)
+	$(INSTALL_BIN) cancel $(BUILDROOT)$(bindir)
+	$(INSTALL_BIN) lp $(BUILDROOT)$(bindir)
+	$(INSTALL_BIN) lpoptions $(BUILDROOT)$(bindir)
+	$(INSTALL_BIN) lpq $(BUILDROOT)$(bindir)
+	$(RM) $(BUILDROOT)$(bindir)/lpr
+	$(LN) lp $(BUILDROOT)$(bindir)/lpr
+	$(RM) $(BUILDROOT)$(bindir)/lprm
+	$(LN) cancel $(BUILDROOT)$(bindir)/lprm
+	$(INSTALL_BIN) lpstat $(BUILDROOT)$(bindir)
 	echo Installing admin commands to $(BUILDROOT)$(sbindir)
 	$(INSTALL_DIR) -m 755 $(BUILDROOT)$(sbindir)
 	$(INSTALL_BIN) cupsaccept $(BUILDROOT)$(sbindir)
@@ -84,15 +91,6 @@ install:
 	$(LN) cupsaccept $(BUILDROOT)$(sbindir)/cupsenable
 	$(RM) $(BUILDROOT)$(sbindir)/cupsreject
 	$(LN) cupsaccept $(BUILDROOT)$(sbindir)/cupsreject
-	echo Installing user commands tp $(BUILDROOT)$(bindir)
-	$(INSTALL_DIR) -m 755 $(BUILDROOT)$(bindir)
-	$(INSTALL_BIN) cancel $(BUILDROOT)$(bindir)
-	$(INSTALL_BIN) lp $(BUILDROOT)$(bindir)
-	$(INSTALL_BIN) lpoptions $(BUILDROOT)$(bindir)
-	$(INSTALL_BIN) lpq $(BUILDROOT)$(bindir)
-	$(INSTALL_BIN) lpr $(BUILDROOT)$(bindir)
-	$(INSTALL_BIN) lprm $(BUILDROOT)$(bindir)
-	$(INSTALL_BIN) lpstat $(BUILDROOT)$(bindir)
 
 
 #
@@ -199,26 +197,6 @@ lpoptions:	lpoptions.o
 lpq:	lpq.o
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o lpq lpq.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
-
-
-#
-# lpr
-#
-
-lpr:	lpr.o
-	echo Linking $@...
-	$(CC) $(LDFLAGS) -o lpr lpr.o $(LIBS)
-	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
-
-
-#
-# lprm
-#
-
-lprm:	lprm.o
-	echo Linking $@...
-	$(CC) $(LDFLAGS) -o lprm lprm.o $(LIBS)
 	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 

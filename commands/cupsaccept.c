@@ -32,7 +32,6 @@ main(int  argc,				// I - Number of command-line arguments
   int		i;			// Looping var
   char		*command,		// Command to do
 		*opt,			// Option pointer
-		uri[1024],		// Printer URI
 		*reason = NULL;		// Reason for reject/disable
   ipp_t		*request;		// IPP request
   ipp_op_t	op;			// Operation
@@ -93,7 +92,7 @@ main(int  argc,				// I - Number of command-line arguments
     }
     else if (!strncmp(argv[i], "--", 2))
     {
-      cupsLangPrintf(stderr, _("%s: Error - unknown option \"%s\"."), argv[0], argv[i]);
+      cupsLangPrintf(stderr, _("%s: Unknown option '%s'."), argv[0], argv[i]);
       return (usage(stderr, command));
     }
     else if (argv[i][0] == '-')
@@ -102,31 +101,12 @@ main(int  argc,				// I - Number of command-line arguments
       {
 	switch (*opt)
 	{
-	  case 'E' : // Encrypt
-	      cupsSetEncryption(HTTP_ENCRYPTION_REQUIRED);
-	      break;
-
-	  case 'U' : // Username
-	      if (opt[1] != '\0')
-	      {
-		cupsSetUser(opt + 1);
-		opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		i ++;
-		if (i >= argc)
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected username after \"-U\" option."), argv[0]);
-		  return (usage(stderr, command));
-		}
-
-		cupsSetUser(argv[i]);
-	      }
-	      break;
-
 	  case 'c' : // Cancel jobs
 	      cancel = true;
+	      break;
+
+	  case 'E' : // Encrypt
+	      cupsSetEncryption(HTTP_ENCRYPTION_REQUIRED);
 	      break;
 
 	  case 'h' : // Connect to host
@@ -140,7 +120,7 @@ main(int  argc,				// I - Number of command-line arguments
 		i ++;
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected hostname after \"-h\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected hostname after '-h' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -159,7 +139,7 @@ main(int  argc,				// I - Number of command-line arguments
 		i ++;
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected reason text after \"-r\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected reason text after '-r' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -167,8 +147,27 @@ main(int  argc,				// I - Number of command-line arguments
 	      }
 	      break;
 
+	  case 'U' : // Username
+	      if (opt[1] != '\0')
+	      {
+		cupsSetUser(opt + 1);
+		opt += strlen(opt) - 1;
+	      }
+	      else
+	      {
+		i ++;
+		if (i >= argc)
+		{
+		  cupsLangPrintf(stderr, _("%s: Expected username after '-U' option."), argv[0]);
+		  return (usage(stderr, command));
+		}
+
+		cupsSetUser(argv[i]);
+	      }
+	      break;
+
 	  default :
-	      cupsLangPrintf(stderr, _("%s: Error - unknown option \"%c\"."), command, *opt);
+	      cupsLangPrintf(stderr, _("%s: Unknown option '%c'."), command, *opt);
 	      return (usage(stderr, command));
 	}
       }
@@ -176,19 +175,34 @@ main(int  argc,				// I - Number of command-line arguments
     else
     {
       // Accept/disable/enable/reject a destination...
+      http_t		*http;		// HTTP connection
+      cups_dest_t	*dest;		// Destination
+      char		resource[1024];	// Resource path
+
+      // Get the named destination...
+      if ((dest = cupsGetNamedDest(CUPS_HTTP_DEFAULT, argv[i], /*instance*/NULL)) == NULL)
+      {
+	cupsLangPrintf(stderr, _("%s: Unknown destination '%s'."), command, argv[i]);
+	return (1);
+      }
+
+      if ((http = cupsConnectDest(dest, CUPS_DEST_FLAGS_NONE, 30000, /*cancel*/NULL, resource, sizeof(resource), /*cb*/NULL, /*user_data*/NULL)) == NULL)
+      {
+	cupsLangPrintf(stderr, _("%s: Unable to connect to '%s': %s"), command, dest->name, cupsGetErrorString());
+        return (1);
+      }
+
+      // Make an IPP request...
       request = ippNewRequest(op);
 
-      // TODO: Fix printer-uri
-      httpAssembleURIf(HTTP_URI_CODING_ALL, uri, sizeof(uri), "ipp", NULL, "localhost", 0, "/printers/%s", argv[i]);
-      ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, uri);
+      ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, cupsGetOption("printer-uri-supported", dest->num_options, dest->options));
       ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name", NULL, cupsGetUser());
 
       if (reason != NULL)
 	ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_TEXT, "printer-state-message", NULL, reason);
 
       // Do the request and get back a response...
-      // TODO: Fix resource path
-      ippDelete(cupsDoRequest(CUPS_HTTP_DEFAULT, request, "/admin/"));
+      ippDelete(cupsDoRequest(CUPS_HTTP_DEFAULT, request, resource));
 
       if (cupsGetError() > IPP_STATUS_OK_CONFLICTING)
       {
@@ -207,9 +221,8 @@ main(int  argc,				// I - Number of command-line arguments
 	//   printer-uri
 	request = ippNewRequest(IPP_OP_PURGE_JOBS);
 
-	ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, uri);
-	// TODO: Fix resource path
-	ippDelete(cupsDoRequest(CUPS_HTTP_DEFAULT, request, "/admin/"));
+	ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, cupsGetOption("printer-uri-supported", dest->num_options, dest->options));
+	ippDelete(cupsDoRequest(CUPS_HTTP_DEFAULT, request, resource));
 
         if (cupsGetError() > IPP_STATUS_OK_CONFLICTING)
 	{
