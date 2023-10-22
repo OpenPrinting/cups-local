@@ -17,16 +17,15 @@
 // Local functions...
 //
 
-static void	check_dest(const char *command, const char *name, size_t *num_dests, cups_dest_t **dests);
-static int	match_list(const char *list, const char *name);
-static int	show_accepting(const char *command, cups_array_t *printers, size_t num_dests, cups_dest_t *dests);
-static int	show_classes(const char *dests);
-static void	show_default(cups_dest_t *dest);
-static int	show_devices(const char *command, cups_array_t *printers, size_t num_dests, cups_dest_t *dests);
-static int	show_jobs(const char *command, cups_array_t *printers, size_t num_dests, cups_dest_t *dests, cups_array_t *users, bool long_status, bool show_ranking, const char *which_jobs);
-static int	show_printers(const char *command, cups_array_t *printers, size_t num_dests, cups_dest_t *dests, bool long_status);
+static int	show_accepting(const char *command, size_t num_dests, cups_dest_t *dests, cups_array_t *printers);
+static int	show_classes(const char *command, cups_array_t *printers);
+static void	show_default(const char *command, size_t num_dests, cups_dest_t *dests);
+static int	show_devices(const char *command, size_t num_dests, cups_dest_t *dests, cups_array_t *printers);
+static int	show_jobs(const char *command, size_t num_dests, cups_dest_t *dests, cups_array_t *printers, cups_array_t *users, bool long_status, bool show_ranking, const char *which_jobs);
+static int	show_printers(const char *command, size_t num_dests, cups_dest_t *dests, cups_array_t *printers, bool long_status);
 static bool	show_scheduler(void);
 static char	*strdate(char *buf, size_t bufsize, time_t timeval);
+static void	update_dests(const char *command, size_t &num_dests, cups_dest_t **dests);
 static int	usage(FILE *out, const char *command);
 
 
@@ -44,6 +43,7 @@ main(int  argc,				// I - Number of command-line arguments
   char		*opt;			// Option pointer
   size_t	num_dests = 0;		// Number of user destinations
   cups_dest_t	*dests = NULL;		// User destinations
+  cups_array_t	*list;			// Printer/user list
   bool		long_status = false;	// Long status report?
   bool		show_ranking = false;	// Show job ranking?
   const char	*which_jobs = "not-completed";
@@ -84,22 +84,105 @@ main(int  argc,				// I - Number of command-line arguments
       {
 	switch (*opt)
 	{
+	  case 'a' : // Show acceptance status
+	      op = 'a';
+
+	      if (opt[1] != '\0')
+	      {
+		list = cupsNewStrings(opt + 1, ',');
+	        opt += strlen(opt) - 1;
+	      }
+	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
+	      {
+		i ++;
+		list = cupsNewStrings(argv[i], ',');
+	      }
+	      else
+	      {
+	        list = NULL;
+	      }
+
+	      update_dests(command, &num_dests, &dests);
+	      status |= show_accepting(command, num_dests, dests, list);
+	      cupsArrayDelete(list);
+	      break;
+
+	  case 'c' : // Show classes and members
+	      op = 'c';
+
+	      if (opt[1] != '\0')
+	      {
+	        list = cupsNewStrings(opt + 1, ',');
+	        opt += strlen(opt) - 1;
+	      }
+	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
+	      {
+		i ++;
+		list = cupsNewStrings(argv[i], ',');
+	      }
+	      else
+	      {
+	        list = NULL;
+	      }
+
+	      status |= show_classes(command, list);
+	      cupsArrayDelete(list);
+	      break;
+
 	  case 'D' : // -D         Show description
-	      long_status = 1;
+	  case 'l' : // -l         Long status or long job status
+	      long_status = true;
+	      break;
+
+	  case 'd' : // -d         Show default destination
+	      op = 'd';
+
+	      update_dests(command, &num_dests, &dests);
+	      show_default(command, num_dests, dests);
 	      break;
 
 	  case 'E' : // -E         Encrypt
 	      cupsSetEncryption(HTTP_ENCRYPTION_REQUIRED);
-
-	      if (http)
-		httpSetEncryption(http, HTTP_ENCRYPTION_REQUIRED);
 	      break;
+
+	  case 'e' : // -e         List destinations
+	      op = 'e';
+
+	      cupsEnumDests(CUPS_DEST_FLAGS_NONE, 10000, /*cancel*/NULL, (cups_ptype_t)0, (cups_ptype_t)0, list_dest, &long_status);
+
+#if 0
+	      for (j = num_temp, dest = temp; j > 0; j --, dest ++)
+	      {
+		if (dest->instance)
+		  printf("%s/%s", dest->name, dest->instance);
+		else
+		  fputs(dest->name, stdout);
+
+		if (long_status)
+		{
+		  const char *printer_uri_supported = cupsGetOption("printer-uri-supported", dest->num_options, dest->options);
+		  const char *printer_is_temporary = cupsGetOption("printer-is-temporary", dest->num_options, dest->options);
+		  const char *type = "network";
+
+		  if (printer_is_temporary && !strcmp(printer_is_temporary, "true"))
+		    type = "temporary";
+		  else if (printer_uri_supported)
+		    type = "permanent";
+
+		  printf(" %s %s %s\n", type, printer_uri_supported ? printer_uri_supported : "none", cupsGetOption("device-uri", dest->num_options, dest->options));
+		}
+		else
+		  putchar('\n');
+	      }
+#endif // 0
+              break;
 
 	  case 'H' : // -H         Show server and port
 	      if (cupsGetServer()[0] == '/')
 		cupsLangPuts(stdout, cupsGetServer());
 	      else
 		cupsLangPrintf(stdout, "%s:%d", cupsGetServer(), ippGetPort());
+
 	      op = 'H';
 	      break;
 
@@ -126,30 +209,52 @@ main(int  argc,				// I - Number of command-line arguments
 	      }
 	      break;
 
+	  case 'o' : // -o DESTS   Show jobs by destination
+	      op = 'o';
+
+	      if (opt[1])
+	      {
+		list = cupsNewStrings(opt + 1, ',');
+	        opt += strlen(opt) - 1;
+	      }
+	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
+	      {
+		i ++;
+		list = cupsNewStrings(argv[i], ',');
+	      }
+	      else
+	      {
+	        list = NULL;
+	      }
+
+	      update_dests(command, &num_dests, &dests);
+	      status |= show_jobs(command, num_dests, dests, list, /*users*/NULL, long_status, show_ranking, which_jobs);
+	      cupsArrayDelete(list);
+	      break;
+
 	  case 'P' :
 	      if (!strcmp(command, "lpq"))
 	      {
 	        // -P DESTINATIONS Show printer status and jobs
 		if (opt[1])
 		{
-		  check_dest(command, opt + 1, &num_dests, &dests);
-
-		  status |= show_jobs(opt + 1, NULL, long_status, ranking, which);
+		  list = cupsNewStrings(opt + 1, ',');
 		  opt += strlen(opt) - 1;
 		}
 		else if ((i + 1) < argc && argv[i + 1][0] != '-')
 		{
 		  i ++;
-
-		  check_dest(command, argv[i], &num_dests, &dests);
-
-		  status |= show_jobs(argv[i], NULL, long_status, ranking, which);
+		  list = cupsNewStrings(argv[i], ',');
 		}
 		else
 		{
 		  cupsLangPrintf(stderr, _("%s: Missing destinations after '-P'."), command);
 		  return (1);
 		}
+
+		update_dests(command, &num_dests, &dests);
+		status |= show_jobs(command, num_dests, dests, list, /*users*/NULL, long_status, ranking, which_jobs);
+		cupsArrayDelete(list);
 	      }
 	      else
 	      {
@@ -158,14 +263,68 @@ main(int  argc,				// I - Number of command-line arguments
 	      }
 	      break;
 
+	  case 'p' : // -p DESTS   Show printers
+	      op = 'p';
+
+	      if (opt[1] != '\0')
+	      {
+		list = cupsNewStrings(opt + 1, ',');
+	        opt += strlen(opt) - 1;
+	      }
+	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
+	      {
+		i ++;
+		list = cupsNewStrings(argv[i], ',');
+	      }
+	      else
+	      {
+	        list = NULL;
+	      }
+
+	      update_dests(command, &num_dests, &dests);
+	      status |= show_printers(command, num_dests, dests, list, long_status);
+	      cupsArrayDelete(list);
+	      break;
+
 	  case 'R' : // Show ranking
 	      show_ranking = true;
+	      break;
+
+	  case 'r' : // Show scheduler status
+	      op = 'r';
+
+	      if (!show_scheduler())
+		return (0);
 	      break;
 
 	  case 'S' : // Show charsets
 	      op = 'S';
 	      if (!argv[i][2])
 		i ++;
+	      break;
+
+	  case 's' : // Show summary
+	      op = 's';
+
+	      update_dests(command, &num_dests, &dests);
+	      show_default(command, num_dests, dests);
+	      status |= show_classes(command, /*printers*/NULL);
+	      status |= show_devices(command, num_dests, dests, /*printers*/NULL);
+	      break;
+
+	  case 't' : // Show all info
+	      op = 't';
+
+	      if (!show_scheduler())
+		return (0);
+
+	      update_dests(command, &num_dests, &dests);
+	      show_default(command, num_dests, dests);
+	      status |= show_classes(command, /*printers*/NULL);
+	      status |= show_devices(command, num_dests, dests, /*printers*/NULL);
+	      status |= show_accepting(command, num_dests, dests, /*printers*/NULL);
+	      status |= show_printers(command, num_dests, dests, /*printers*/NULL, long_status);
+	      status |= show_jobs(command, num_dests, dests, /*printers*/NULL, /*users*/NULL, long_status, show_ranking, which_jobs);
 	      break;
 
 	  case 'U' : // Username
@@ -180,17 +339,63 @@ main(int  argc,				// I - Number of command-line arguments
 		if (i >= argc)
 		{
 		  cupsLangPrintf(stderr, _("%s: Error - expected username after '-U' option."), command);
-		  usage();
+		  return (usage(stderr, command));
 		}
 
 		cupsSetUser(argv[i]);
 	      }
 	      break;
 
+	  case 'u' : // Show jobs by user
+	      op = 'u';
+
+	      if (opt[1] != '\0')
+	      {
+	        list = cupsArrayNewStrings(opt + 1, ',');
+	        opt += strlen(opt) - 1;
+	      }
+	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
+	      {
+		i ++;
+	        list = cupsArrayNewStrings(argv[i], ',');
+	      }
+	      else
+	      {
+	        list = NULL;
+	      }
+
+	      update_dests(command, &num_dests, &dests);
+	      status |= show_jobs(command, num_dests, dests, /*printers*/NULL, list, long_status, show_ranking, which_jobs);
+	      cupsArrayDelete(list);
+	      break;
+
+	  case 'v' : // Show printer devices
+	      op = 'v';
+
+	      if (opt[1] != '\0')
+	      {
+		list = cupsArrayNewStrings(opt + 1, ',');
+	        opt += strlen(opt) - 1;
+	      }
+	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
+	      {
+		i ++;
+		list = cupsArrayNewStrings(argv[i], ',');
+	      }
+	      else
+	      {
+	        list = NULL;
+	      }
+
+	      update_dests(command, &num_dests, &dests);
+	      status |= show_devices(command, num_dests, dests, list);
+	      cupsArrayDelete(list);
+	      break;
+
 	  case 'W' : // Show which jobs?
 	      if (opt[1] != '\0')
 	      {
-		which = opt + 1;
+		which_jobs = opt + 1;
 		opt += strlen(opt) - 1;
 	      }
 	      else
@@ -200,505 +405,48 @@ main(int  argc,				// I - Number of command-line arguments
 		if (i >= argc)
 		{
 		  cupsLangPrintf(stderr, _("%s: Error - need 'completed', 'not-completed', or 'all' after '-W' option."), command);
-		  usage();
+		  return (usage(stderr, command));
 		}
 
-		which = argv[i];
+		which_jobs = argv[i];
 	      }
 
-	      if (strcmp(which, "completed") && strcmp(which, "not-completed") && strcmp(which, "all"))
+	      if (strcmp(which_jobs, "completed") && strcmp(which_jobs, "not-completed") && strcmp(which_jobs, "all"))
 	      {
-		cupsLangPrintf(stderr, _("%s: Error - need 'completed', 'not-completed', or 'all' after '-W' option."), command);
-		usage();
-	      }
-	      break;
-
-	  case 'a' : // Show acceptance status
-	      op = 'a';
-
-	      if (opt[1] != '\0')
-	      {
-		check_dest(command, opt + 1, &num_dests, &dests);
-
-		status |= show_accepting(opt + 1, num_dests, dests);
-	        opt += strlen(opt) - 1;
-	      }
-	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
-	      {
-		i ++;
-
-		check_dest(command, argv[i], &num_dests, &dests);
-
-		status |= show_accepting(argv[i], num_dests, dests);
-	      }
-	      else
-	      {
-		if (num_dests <= 1)
-		{
-		  cupsFreeDests(num_dests, dests);
-		  num_dests = cupsGetDests(&dests);
-
-		  if (num_dests == 0 && (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST || cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED))
-		  {
-		    cupsLangPrintf(stderr, _("%s: Error - add '/version=1.1' to server name."), command);
-		    return (1);
-		  }
-		}
-
-		status |= show_accepting(NULL, num_dests, dests);
-	      }
-	      break;
-
-	  case 'c' : // Show classes and members
-	      op = 'c';
-
-	      if (opt[1] != '\0')
-	      {
-		check_dest(command, opt + 1, &num_dests, &dests);
-
-		status |= show_classes(opt + 1);
-	        opt += strlen(opt) - 1;
-	      }
-	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
-	      {
-		i ++;
-
-		check_dest(command, argv[i], &num_dests, &dests);
-
-		status |= show_classes(argv[i]);
-	      }
-	      else
-		status |= show_classes(NULL);
-	      break;
-
-	  case 'd' : // Show default destination
-	      op = 'd';
-
-	      if (num_dests != 1 || !dests[0].is_default)
-	      {
-		cupsFreeDests(num_dests, dests);
-
-		dests     = cupsGetNamedDest(CUPS_HTTP_DEFAULT, NULL, NULL);
-		num_dests = dests ? 1 : 0;
-
-		if (num_dests == 0 &&
-		    (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST ||
-		     cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED))
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - add '/version=1.1' to server name."), command);
-		  return (1);
-		}
-	      }
-
-	      show_default(dests);
-	      break;
-
-	  case 'e' : // List destinations
-	      {
-                cups_dest_t *temp = NULL, *dest;
-                int j, num_temp = cupsGetDests(&temp);
-
-                op = 'e';
-
-                for (j = num_temp, dest = temp; j > 0; j --, dest ++)
-                {
-                  if (dest->instance)
-                    printf("%s/%s", dest->name, dest->instance);
-                  else
-                    fputs(dest->name, stdout);
-
-                  if (long_status)
-                  {
-                    const char *printer_uri_supported = cupsGetOption("printer-uri-supported", dest->num_options, dest->options);
-                    const char *printer_is_temporary = cupsGetOption("printer-is-temporary", dest->num_options, dest->options);
-                    const char *type = "network";
-
-                    if (printer_is_temporary && !strcmp(printer_is_temporary, "true"))
-                      type = "temporary";
-                    else if (printer_uri_supported)
-                      type = "permanent";
-
-                    printf(" %s %s %s\n", type, printer_uri_supported ? printer_uri_supported : "none", cupsGetOption("device-uri", dest->num_options, dest->options));
-                  }
-                  else
-                    putchar('\n');
-                }
-
-                cupsFreeDests(num_temp, temp);
-              }
-              break;
-
-	  case 'f' : // Show forms
-	      op   = 'f';
-	      if (opt[1] != '\0')
-	      {
-	        opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		i ++;
-		if (i >= argc)
-		  return (1);
-	      }
-	      break;
-
-	  case 'l' : // Long status or long job status
-	      long_status = 2;
-	      break;
-
-	  case 'o' : // Show jobs by destination
-	      op = 'o';
-
-	      if (opt[1])
-	      {
-		check_dest(command, opt + 1, &num_dests, &dests);
-
-		status |= show_jobs(opt + 1, NULL, long_status, show_ranking, which);
-	        opt += strlen(opt) - 1;
-	      }
-	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
-	      {
-		i ++;
-
-		check_dest(command, argv[i], &num_dests, &dests);
-
-		status |= show_jobs(argv[i], NULL, long_status, show_ranking, which);
-	      }
-	      else
-		status |= show_jobs(NULL, NULL, long_status, show_ranking, which);
-	      break;
-
-	  case 'p' : // Show printers
-	      op = 'p';
-
-	      if (opt[1] != '\0')
-	      {
-		check_dest(command, opt + 1, &num_dests, &dests);
-
-		status |= show_printers(opt + 1, num_dests, dests,
-					long_status);
-	        opt += strlen(opt) - 1;
-	      }
-	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
-	      {
-		i ++;
-
-		check_dest(command, argv[i], &num_dests, &dests);
-
-		status |= show_printers(argv[i], num_dests, dests, long_status);
-	      }
-	      else
-	      {
-		if (num_dests <= 1)
-		{
-		  cupsFreeDests(num_dests, dests);
-		  num_dests = cupsGetDests(&dests);
-
-		  if (num_dests == 0 &&
-		      (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST ||
-		       cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED))
-		  {
-		    cupsLangPrintf(stderr, _("%s: Error - add '/version=1.1' to server name."), command);
-		    return (1);
-		  }
-		}
-
-		status |= show_printers(NULL, num_dests, dests, long_status);
-	      }
-	      break;
-
-	  case 'r' : // Show scheduler status
-	      op = 'r';
-
-	      if (!show_scheduler())
-		return (0);
-	      break;
-
-	  case 's' : // Show summary
-	      op = 's';
-
-	      if (num_dests <= 1)
-	      {
-		cupsFreeDests(num_dests, dests);
-		num_dests = cupsGetDests(&dests);
-
-		if (num_dests == 0 &&
-		    (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST ||
-		     cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED))
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - add '/version=1.1' to server name."), command);
-		  return (1);
-		}
-	      }
-
-	      show_default(cupsGetDest(NULL, NULL, num_dests, dests));
-	      status |= show_classes(NULL);
-	      status |= show_devices(NULL, num_dests, dests);
-	      break;
-
-	  case 't' : // Show all info
-	      op = 't';
-
-	      if (num_dests <= 1)
-	      {
-		cupsFreeDests(num_dests, dests);
-		num_dests = cupsGetDests(&dests);
-
-		if (num_dests == 0 &&
-		    (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST ||
-		     cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED))
-		{
-		  cupsLangPrintf(stderr, _("%s: Error - add '/version=1.1' to server name."), command);
-		  return (1);
-		}
-	      }
-
-	      if (!show_scheduler())
-		return (0);
-
-	      show_default(cupsGetDest(NULL, NULL, num_dests, dests));
-	      status |= show_classes(NULL);
-	      status |= show_devices(NULL, num_dests, dests);
-	      status |= show_accepting(NULL, num_dests, dests);
-	      status |= show_printers(NULL, num_dests, dests, long_status);
-	      status |= show_jobs(NULL, NULL, long_status, show_ranking, which);
-	      break;
-
-	  case 'u' : // Show jobs by user
-	      op = 'u';
-
-	      if (opt[1] != '\0')
-	      {
-		status |= show_jobs(NULL, opt + 1, long_status, show_ranking, which);
-	        opt += strlen(opt) - 1;
-	      }
-	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
-	      {
-		i ++;
-		status |= show_jobs(NULL, argv[i], long_status, show_ranking, which);
-	      }
-	      else
-		status |= show_jobs(NULL, NULL, long_status, show_ranking, which);
-	      break;
-
-	  case 'v' : // Show printer devices
-	      op = 'v';
-
-	      if (opt[1] != '\0')
-	      {
-		check_dest(command, opt + 1, &num_dests, &dests);
-
-		status |= show_devices(opt + 1, num_dests, dests);
-	        opt += strlen(opt) - 1;
-	      }
-	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
-	      {
-		i ++;
-
-		check_dest(command, argv[i], &num_dests, &dests);
-
-		status |= show_devices(argv[i], num_dests, dests);
-	      }
-	      else
-	      {
-		if (num_dests <= 1)
-		{
-		  cupsFreeDests(num_dests, dests);
-		  num_dests = cupsGetDests(&dests);
-
-		  if (num_dests == 0 &&
-		      (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST ||
-		       cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED))
-		  {
-		    cupsLangPrintf(stderr, _("%s: Error - add '/version=1.1' to server name."), command);
-		    return (1);
-		  }
-		}
-
-		status |= show_devices(NULL, num_dests, dests);
+		cupsLangPrintf(stderr, _("%s: Need 'completed', 'not-completed', or 'all' after '-W' option."), command);
+		return (usage(stderr, command));
 	      }
 	      break;
 
 	  default :
 	      cupsLangPrintf(stderr, _("%s: Unknown option '-%c'."), command, argv[i][1]);
-	      usage();
+	      return (usage(stderr, command));
 	}
       }
     }
     else
     {
-      status |= show_jobs(argv[i], NULL, long_status, show_ranking, which);
-      op = 'o';
+      // DESTINATION[,...,DESTINATION]
+      op   = 'o';
+      list = cupsArrayNewStrings(argv[i], ',');
+
+      update_dests(command, &num_dests, &dests);
+      status |= show_jobs(command, num_dests, dests, list, /*users*/NULL, long_status, show_ranking, which_jobs);
+      cupsArrayDelete(list);
     }
   }
 
   if (!op)
-    status |= show_jobs(NULL, cupsGetUser(), long_status, show_ranking, which);
+  {
+    list = cupsArrayNewStrings(NULL, ',');
+    cupsArrayAdd(list, cupsGetUser());
+
+    update_dests(command, &num_dests, &dests);
+    status |= show_jobs(command, num_dests, dests, /*printers*/NULL, list, long_status, show_ranking, which_jobs);
+    cupsArrayDelete(list);
+  }
 
   return (status);
-}
-
-
-//
-// 'check_dest()' - Verify that the named destination(s) exists.
-//
-
-static void
-check_dest(const char  *command,	// I  - Command name
-           const char  *name,		// I  - List of printer/class names
-           int         *num_dests,	// IO - Number of destinations
-	   cups_dest_t **dests)		// IO - Destinations
-{
-  const char	*dptr;			// Pointer into name
-  char		*pptr,			// Pointer into printer
-		printer[1024];		// Current printer/class name
-
-
- /*
-  * Load the destination list as necessary...
-  */
-
-  if (*num_dests <= 1)
-  {
-    if (*num_dests)
-      cupsFreeDests(*num_dests, *dests);
-
-    if (strchr(name, ','))
-      *num_dests = cupsGetDests(dests);
-    else
-    {
-      strlcpy(printer, name, sizeof(printer));
-      if ((pptr = strchr(printer, '/')) != NULL)
-        *pptr++ = '\0';
-
-      if ((*dests = cupsGetNamedDest(CUPS_HTTP_DEFAULT, printer, pptr)) == NULL)
-      {
-	if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST ||
-	    cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
-	  cupsLangPrintf(stderr,
-			  _("%s: Error - add '/version=1.1' to server name."),
-			  command);
-	else
-	  cupsLangPrintf(stderr,
-			  _("%s: Invalid destination name in list '%s'."),
-			  command, name);
-
-        exit(1);
-      }
-      else
-      {
-        *num_dests = 1;
-        return;
-      }
-    }
-  }
-
- /*
-  * Scan the name string for printer/class name(s)...
-  */
-
-  for (dptr = name; *dptr;)
-  {
-   /*
-    * Skip leading whitespace and commas...
-    */
-
-    while (isspace(*dptr & 255) || *dptr == ',')
-      dptr ++;
-
-    if (!*dptr)
-      break;
-
-   /*
-    * Extract a single destination name from the name string...
-    */
-
-    for (pptr = printer; !isspace(*dptr & 255) && *dptr != ',' && *dptr;)
-    {
-      if ((size_t)(pptr - printer) < (sizeof(printer) - 1))
-        *pptr++ = *dptr++;
-      else
-      {
-        cupsLangPrintf(stderr,
-	                _("%s: Invalid destination name in list '%s'."),
-			command, name);
-        exit(1);
-      }
-    }
-
-    *pptr = '\0';
-
-   /*
-    * Check the destination...
-    */
-
-    if (!cupsGetDest(printer, NULL, *num_dests, *dests))
-    {
-      if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST ||
-          cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
-	cupsLangPrintf(stderr,
-	                _("%s: Error - add '/version=1.1' to server name."),
-			command);
-      else
-	cupsLangPrintf(stderr,
-			_("%s: Unknown destination '%s'."), command, printer);
-
-      exit(1);
-    }
-  }
-}
-
-
-//
-// 'match_list()' - Match a name from a list of comma or space-separated names.
-//
-
-static int				// O - 1 on match, 0 on no match
-match_list(const char *list,		// I - List of names
-           const char *name)		// I - Name to find
-{
-  const char	*nameptr;		// Pointer into name
-
-
- /*
-  * An empty list always matches...
-  */
-
-  if (!list || !*list)
-    return (1);
-
-  if (!name)
-    return (0);
-
-  do
-  {
-   /*
-    * Skip leading whitespace and commas...
-    */
-
-    while (isspace(*list & 255) || *list == ',')
-      list ++;
-
-    if (!*list)
-      break;
-
-   /*
-    * Compare names...
-    */
-
-    for (nameptr = name;
-	 *nameptr && *list && tolower(*nameptr & 255) == tolower(*list & 255);
-	 nameptr ++, list ++);
-
-    if (!*nameptr && (!*list || *list == ',' || isspace(*list & 255)))
-      return (1);
-
-    while (*list && !isspace(*list & 255) && *list != ',')
-      list ++;
-  }
-  while (*list);
-
-  return (0);
 }
 
 
@@ -707,99 +455,40 @@ match_list(const char *list,		// I - List of names
 //
 
 static int				// O - 0 on success, 1 on fail
-show_accepting(const char  *printers,	// I - Destinations
-               int         num_dests,	// I - Number of user-defined dests
-	       cups_dest_t *dests)	// I - User-defined destinations
+show_accepting(const char   *command,	// I - Command name
+	       size_t       num_dests,	// I - Number of user-defined dests
+	       cups_dest_t  *dests,	// I - User-defined destinations
+	       cups_array_t *printers)	// I - Destinations to show
 {
-  int		i;			// Looping var
-  ipp_t		*request,		// IPP Request
-		*response;		// IPP Response
-  ipp_attribute_t *attr;		// Current attribute
-  const char	*printer,		// Printer name
-		*message;		// Printer device URI
-  int		accepting;		// Accepting requests?
-  time_t	ptime;			// Printer state time
-  char		printer_state_time[255];// Printer state time
-  static const char *pattrs[] =		// Attributes we need for printers...
-		{
-		  "printer-name",
-		  "printer-state-change-time",
-		  "printer-state-message",
-		  "printer-is-accepting-jobs"
-		};
+  int		ret = 0;		// Return value
+  size_t	i, j,			// Looping vars
+		count;			// Number of values
+  cups_dest_t	*dest;			// Current destination
 
 
-  if (printers != NULL && !strcmp(printers, "all"))
-    printers = NULL;
-
- /*
-  * Build a IPP_OP_CUPS_GET_PRINTERS request, which requires the following
-  * attributes:
-  *
-  *    attributes-charset
-  *    attributes-natural-language
-  *    requested-attributes
-  *    requesting-user-name
-  */
-
-  request = ippNewRequest(IPP_OP_CUPS_GET_PRINTERS);
-
-  ippAddStrings(request, IPP_TAG_OPERATION, IPP_TAG_KEYWORD,
-                "requested-attributes", sizeof(pattrs) / sizeof(pattrs[0]),
-		NULL, pattrs);
-
-  ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name",
-               NULL, cupsGetUser());
-
- /*
-  * Do the request and get back a response...
-  */
-
-  response = cupsDoRequest(CUPS_HTTP_DEFAULT, request, "/");
-
-  if (cupsGetError() == IPP_STATUS_ERROR_SERVICE_UNAVAILABLE)
+  // Loop through the available destinations and report on those that match...
+  for (i = num_dests, dest = dests; i > 0; i --, dest ++)
   {
-    cupsLangPrintf(stderr, _("%s: Scheduler is not running."), "lpstat");
-    ippDelete(response);
-    return (1);
-  }
-  else if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST || cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
-  {
-    cupsLangPrintf(stderr,
-		    _("%s: Error - add '/version=1.1' to server name."),
-		    "lpstat");
-    ippDelete(response);
-    return (1);
-  }
-  else if (cupsGetError() > IPP_STATUS_OK_CONFLICTING)
-  {
-    cupsLangPrintf(stderr, "lpstat: %s", cupsGetErrorString());
-    ippDelete(response);
-    return (1);
-  }
+    const char	*value,				// Temporary value
+		*printer_info;			// "printer-info" value
+    bool	printer_is_accepting_jobs,	// "printer-is-accepting-jobs" value
+    const char	*printer_location,		// "printer-location" value
+		*printer_make_and_model;	// "printer-make-and-model" value
+    ipp_pstate_t printer_state;			// "printer-state" value
+    char	printer_state_change_date[255];	// "printer-state-change-date-time" string
+    time_t	printer_state_change_time;	// "printer-state-change-date-time" value
+    const char	*printer_state_message;		// "printer-state-message" value
+    cups_array_t *printer_state_reasons;	// "printer-state-reasons" value
+    cups_ptype_t printer_type;			// "printer-type" value
 
-  if (response)
-  {
-   /*
-    * Loop through the printers returned in the list and display
-    * their devices...
-    */
+    // Filter out printers we don't care about...
+    if (dest->instance || (cupsArrayGetCount(printers) > 0 && !cupsArrayFind(printers, dest->name)))
+      continue;
 
-    for (attr = response->attrs; attr != NULL; attr = attr->next)
-    {
-     /*
-      * Skip leading attributes until we hit a printer...
-      */
-
-      while (attr != NULL && attr->group_tag != IPP_TAG_PRINTER)
-        attr = attr->next;
-
-      if (attr == NULL)
-        break;
-
-     /*
-      * Pull the needed attributes from this printer...
-      */
+    // Grab values and report them...
+    value                     = cupsGetOption("printer-is-accepting-jobs", dest->num_options, dest->options);
+    printer_is_accepting_jobs = value && !strcmp(value, "true");
+    printer_location          = cupsGetOption("printer-location", dest->num_options, dest->options);
 
       printer   = NULL;
       message   = NULL;
@@ -890,7 +579,8 @@ show_accepting(const char  *printers,	// I - Destinations
 //
 
 static int				// O - 0 on success, 1 on fail
-show_classes(const char *dests)		// I - Destinations
+show_classes(const char   *command,	// I - Command name
+	     cups_array_t *printers)	// I - Destinations to show
 {
   int		i;			// Looping var
   ipp_t		*request,		// IPP Request
@@ -1111,7 +801,9 @@ show_classes(const char *dests)		// I - Destinations
 //
 
 static void
-show_default(cups_dest_t *dest)		// I - Default destination
+show_default(const char  *command,	// I - Command name
+	     size_t      num_dests,	// I - Number of user-defined dests
+	     cups_dest_t *dests)	// I - User-defined destinations
 {
   const char	*printer,		// Printer name
 		*envname;		// Environment variable name
@@ -1149,9 +841,9 @@ show_default(cups_dest_t *dest)		// I - Default destination
 
 static int				// O - 0 on success, 1 on fail
 show_devices(const char   *command,	// I - Command name
-	     cups_array_t *printers,	// I - Destinations to show
-	     int          num_dests,	// I - Number of user-defined dests
-	     cups_dest_t  *dests)	// I - User-defined destinations
+	     size_t       num_dests,	// I - Number of user-defined dests
+	     cups_dest_t  *dests,	// I - User-defined destinations
+	     cups_array_t *printers)	// I - Destinations to show
 {
   int		i;			// Looping var
   ipp_t		*request,		// IPP Request
@@ -1324,9 +1016,9 @@ show_devices(const char   *command,	// I - Command name
 
 static int				// O - Exit status
 show_jobs(const char   *command,	// I - Command name
-	  cups_array_t *printers,	// I - Destinations to show
 	  int          num_dests,	// I - Number of destinationss
 	  cups_dest_t  *dests,		// I - Destinations
+	  cups_array_t *printers,	// I - Destinations to show
           cups_array_t *users,		// I - Users
           bool         long_status,	// I - Show long status?
           bool         show_ranking,	// I - Show job ranking?
@@ -1540,13 +1232,14 @@ show_jobs(const char   *command,	// I - Command name
 
 static int				// O - Exit status
 show_printers(const char   *command,	// I - Command name
-              cups_array_t *printers,	// I - Destinations
               int          num_dests,	// I - Number of user-defined dests
 	      cups_dest_t  *dests,	// I - User-defined destinations
+              cups_array_t *printers,	// I - Destinations
               bool         long_status)	// I - Show long status?
 {
   int		ret = 0;		// Return value
-  size_t	i, j;			// Looping vars
+  size_t	i, j,			// Looping vars
+		count;			// Number of values
   cups_dest_t	*dest;			// Current destination
   http_t	*http;			// Connection to printer
   char		resource[1024];		// Resource path
@@ -1556,21 +1249,6 @@ show_printers(const char   *command,	// I - Command name
   ipp_attribute_t *attr,		// Current attribute
 		*jobattr,		// Current job attribute
 		*job_state_reasons;	// "job-state-reasons" attribute
-  static const char * const pattrs[] =	// Attributes we need for printers...
-  {
-    "printer-name",
-    "printer-state",
-    "printer-state-message",
-    "printer-state-reasons",
-    "printer-state-change-time",
-    "printer-type",
-    "printer-info",
-    "printer-location",
-    "printer-make-and-model",
-    "printer-uri-supported",
-    "requesting-user-name-allowed",
-    "requesting-user-name-denied"
-  };
   static const char * const jattrs[] =	// Attributes we need for jobs...
   {
     "job-id",
@@ -1583,16 +1261,15 @@ show_printers(const char   *command,	// I - Command name
   {
     int		job_id = 0;			// Current "job-id" value
     const char	*printer_uri,			// "printer-uri" value
-		*printer_info = NULL,		// "printer-info" value
-		*printer_location = NULL,	// "printer-location" value
-		*printer_make_and_model = NULL;	// "printer-make-and-model" value
+		*printer_info,			// "printer-info" value
+		*printer_location,		// "printer-location" value
+		*printer_make_and_model;	// "printer-make-and-model" value
     ipp_pstate_t printer_state = IPP_PSTATE_STOPPED;
 						// "printer-state" value
     char	printer_state_change_date[255];	// "printer-state-change-date-time" string
     time_t	printer_state_change_time;	// "printer-state-change-date-time" value
-    const char	*printer_state_message = NULL,	// "printer-state-message" value
-    ipp_attribute_t *printer_state_reasons = NULL,
-						// "printer-state-reasons" value
+    const char	*printer_state_message;		// "printer-state-message" value
+    cups_array_t *printer_state_reasons;	// "printer-state-reasons" value
     cups_ptype_t printer_type = CUPS_PRINTER_LOCAL;
 						// "printer-type" value
 
@@ -1795,6 +1472,26 @@ strdate(char   *buf,			// I - Buffer
   }
 
   return (buf);
+}
+
+
+//
+// 'update_dests()' - Update the destinations array as needed.
+//
+
+static void
+update_dests(const char  *command,	// I  - Command name
+             size_t      &num_dests,	// IO - Number of destinations
+             cups_dest_t **dests);	// IO - Destinations
+{
+  if (!*num_dests)
+  {
+    if ((*num_dests = cupsGetDests(CUPS_HTTP_DEFAULT, dests)) == 0 && (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST || cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED))
+    {
+      cupsLangPrintf(stderr, _("%s: Add '/version=1.1' to server name."), command);
+      exit(1);
+    }
+  }
 }
 
 
