@@ -15,8 +15,8 @@ TARGETS	=	\
 		cupsaccept \
 		lp \
 		lpadmin \
-		lpc \
-		lpmove \
+#		lpc \
+#		lpmove \
 		lpoptions \
 		lpq \
 		lpstat
@@ -25,8 +25,8 @@ OBJS	=	\
 		cupsaccept.o \
 		lp.o \
 		lpadmin.o \
-		lpc.o \
-		lpmove.o \
+#		lpc.o \
+#		lpmove.o \
 		lpoptions.o \
 		lpq.o \
 		lpstat.o
@@ -73,18 +73,19 @@ install:
 	$(INSTALL_BIN) cancel $(BUILDROOT)$(bindir)
 	$(INSTALL_BIN) lp $(BUILDROOT)$(bindir)
 	$(INSTALL_BIN) lpoptions $(BUILDROOT)$(bindir)
-	$(INSTALL_BIN) lpq $(BUILDROOT)$(bindir)
+	$(INSTALL_BIN) lpstat $(BUILDROOT)$(bindir)
+	$(RM) $(BUILDROOT)$(bindir)/lpq
+	$(LN) lpstat $(BUILDROOT)$(bindir)/lpq
 	$(RM) $(BUILDROOT)$(bindir)/lpr
 	$(LN) lp $(BUILDROOT)$(bindir)/lpr
 	$(RM) $(BUILDROOT)$(bindir)/lprm
 	$(LN) cancel $(BUILDROOT)$(bindir)/lprm
-	$(INSTALL_BIN) lpstat $(BUILDROOT)$(bindir)
 	echo Installing admin commands to $(BUILDROOT)$(sbindir)
 	$(INSTALL_DIR) -m 755 $(BUILDROOT)$(sbindir)
 	$(INSTALL_BIN) cupsaccept $(BUILDROOT)$(sbindir)
 	$(INSTALL_BIN) lpadmin $(BUILDROOT)$(sbindir)
-	$(INSTALL_BIN) lpc $(BUILDROOT)$(sbindir)
-	$(INSTALL_BIN) lpmove $(BUILDROOT)$(sbindir)
+#	$(INSTALL_BIN) lpc $(BUILDROOT)$(sbindir)
+#	$(INSTALL_BIN) lpmove $(BUILDROOT)$(sbindir)
 	$(RM) $(BUILDROOT)$(sbindir)/cupsdisable
 	$(LN) cupsaccept $(BUILDROOT)$(sbindir)/cupsdisable
 	$(RM) $(BUILDROOT)$(sbindir)/cupsenable
@@ -111,8 +112,8 @@ uninstall:
 	$(RM) $(BUILDROOT)$(sbindir)/cupsenable
 	$(RM) $(BUILDROOT)$(sbindir)/cupsreject
 	$(RM) $(BUILDROOT)$(sbindir)/lpadmin
-	$(RM) $(BUILDROOT)$(sbindir)/lpc
-	$(RM) $(BUILDROOT)$(sbindir)/lpmove
+#	$(RM) $(BUILDROOT)$(sbindir)/lpc
+#	$(RM) $(BUILDROOT)$(sbindir)/lpmove
 	-$(RMDIR) $(BUILDROOT)$(sbindir)
 
 

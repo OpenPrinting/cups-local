@@ -167,7 +167,7 @@ main(int  argc,				// I - Number of command-line arguments
 	      break;
 
 	  default :
-	      cupsLangPrintf(stderr, _("%s: Unknown option '%c'."), command, *opt);
+	      cupsLangPrintf(stderr, _("%s: Unknown option '-%c'."), command, *opt);
 	      return (usage(stderr, command));
 	}
       }

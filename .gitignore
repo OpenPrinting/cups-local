@@ -1,7 +1,9 @@
 /autom4te*.cache
 /commands/cancel
 /commands/cupsaccept
+/commands/cupsdisable
 /commands/cupsenable
+/commands/cupsreject
 /commands/lp
 /commands/lpadmin
 /commands/lpc

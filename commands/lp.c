@@ -12,13 +12,15 @@
 #include <config.h>
 #include <cups/cups.h>
 #include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 
 //
 // Local functions.
 //
 
-static http_t		*connect_dest(const char *command, const char *printer, const char *instance, cupst_dest_t *dest, cups_dinfo_t *dinfo, char *resource, size_t resourcesize);
+static http_t		*connect_dest(const char *command, const char *printer, const char *instance, cups_dest_t **dest, cups_dinfo_t **dinfo, char *resource, size_t resourcesize);
 static int		print_files(const char *command, http_t *http, cups_dest_t *dest, cups_dinfo_t *dinfo, size_t num_files, const char **files, const char *title, size_t num_options, cups_option_t *options);
 static int		send_document(const char *command, http_t *http, cups_dest_t *dest, cups_dinfo_t *dinfo, int job_id, const char *docname, const char *format, bool last_document, int fd);
 static int		set_job_attrs(const char *command, http_t *http, cups_dest_t *dest, cups_dinfo_t *dinfo, const char *resource, int job_id, int num_options, cups_option_t *options);
@@ -34,7 +36,8 @@ main(int  argc,				// I - Number of command-line arguments
      char *argv[])			// I - Command-line arguments
 {
   const char	*command;		// Command name
-  int		i, j;			// Looping vars
+  int		i;			// Looping var
+  size_t	idx;			// Index into options
   int		job_id = 0;		// Job ID
   char		*printer = NULL,	// Printer name
 		*instance = NULL,	// Instance name
@@ -42,7 +45,8 @@ main(int  argc,				// I - Number of command-line arguments
 		*val,			// Option value
 		*ptr,			// Pointer into value
 		*title = NULL,		// Job title
-		email[1024];		// EMail address
+		email[1024],		// EMail address
+		emailhost[256];		// This hostname
   int		priority;		// Job priority (1-100)
   int		num_copies;		// Number of copies per file
   size_t	num_files = 0;		// Number of files to print
@@ -82,7 +86,7 @@ main(int  argc,				// I - Number of command-line arguments
     }
     else if (!strncmp(argv[i], "--", 2) && argv[i][2])
     {
-      cupsLangPrintf(stderr, _("%s: Unknown option \"%s\"."), command, argv[i]);
+      cupsLangPrintf(stderr, _("%s: Unknown option '%s'."), command, argv[i]);
       return (usage(stderr, command));
     }
     else if (argv[i][0] == '-' && argv[i][1] && !end_options)
@@ -110,7 +114,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Expected destination after \"-d\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected destination after '-d' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -140,7 +144,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Expected server after \"-H\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected server after '-H' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -160,7 +164,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Expected job ID after \"-i\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected job ID after '-i' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -175,7 +179,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 	      if ((ptr = strrchr(val, '-')) != NULL)
 	      {
-	        *ptr++ = '\0'
+	        *ptr++ = '\0';
 		job_id = atoi(ptr);
 
                 printer = val;
@@ -183,6 +187,7 @@ main(int  argc,				// I - Number of command-line arguments
 		  *instance++ = '\0';
 
 		if ((http = connect_dest(command, printer, instance, &dest, &dinfo, resource, sizeof(resource))) == NULL)
+		  return (1);
 	      }
 	      else
 	      {
@@ -197,7 +202,7 @@ main(int  argc,				// I - Number of command-line arguments
 	      break;
 
 	  case 'm' : // -m         Send email when job is done
-	      snprintf(email, sizeof(email), "mailto:%s@%s", cupsGetUser(), httpGetHostname(NULL, buffer, sizeof(buffer)));
+	      snprintf(email, sizeof(email), "mailto:%s@%s", cupsGetUser(), httpGetHostname(NULL, emailhost, sizeof(emailhost)));
 	      num_options = cupsAddOption("notify-recipient-uri", email, num_options, &options);
 
 	      silent = true;
@@ -216,7 +221,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Expected copies after \"-n\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected copies after '-n' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -244,7 +249,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Expected option=value after \"-o\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected option=value after '-o' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -267,7 +272,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		  if (i >= argc)
 		  {
-		    cupsLangPrintf(stderr, _("%s: Expected page list after \"-P\" option."), command);
+		    cupsLangPrintf(stderr, _("%s: Expected page list after '-P' option."), command);
 		    return (usage(stderr, command));
 		  }
 
@@ -290,7 +295,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		  if (i >= argc)
 		  {
-		    cupsLangPrintf(stderr, _("%s: Expected destination after \"-d\" option."), command);
+		    cupsLangPrintf(stderr, _("%s: Expected destination after '-d' option."), command);
 		    return (usage(stderr, command));
 		  }
 
@@ -315,7 +320,7 @@ main(int  argc,				// I - Number of command-line arguments
 	      {
 		if ((i + 1) >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Expected priority after \"-%c\" option."), command, *opt);
+		  cupsLangPrintf(stderr, _("%s: Expected priority after '-%c' option."), command, *opt);
 		  return (usage(stderr, command));
 		}
 
@@ -354,7 +359,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Expected title after \"-t\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected title after '-t' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -373,7 +378,7 @@ main(int  argc,				// I - Number of command-line arguments
 		i ++;
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Expected username after \"-U\" option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected username after '-U' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -382,7 +387,7 @@ main(int  argc,				// I - Number of command-line arguments
 	      break;
 
 	  default :
-	      cupsLangPrintf(stderr, _("%s: Unknown option \"%c\"."), command, *opt);
+	      cupsLangPrintf(stderr, _("%s: Unknown option '-%c'."), command, *opt);
 	      return (usage(stderr, command));
 	}
       }
@@ -402,7 +407,7 @@ main(int  argc,				// I - Number of command-line arguments
       // Print a file...
       if (access(argv[i], R_OK) != 0)
       {
-        cupsLangPrintf(stderr, _("%s: Unable to access '%s' - %s"), command, argv[i], strerror(errno));
+        cupsLangPrintf(stderr, _("%s: Unable to access '%s': %s"), command, argv[i], strerror(errno));
         return (1);
       }
 
@@ -430,6 +435,13 @@ main(int  argc,				// I - Number of command-line arguments
       return (1);
   }
 
+  // Merge default options...
+  for (idx = 0; idx < dest->num_options; idx ++)
+  {
+    if (!cupsGetOption(dest->options[idx].name, num_options, options))
+      num_options = cupsAddOption(dest->options[idx].name, dest->options[idx].value, num_options, &options);
+  }
+
   // Process things...
   if (job_id)
   {
@@ -439,21 +451,21 @@ main(int  argc,				// I - Number of command-line arguments
   else if (num_files > 0)
   {
     job_id = print_files(command, http, dest, dinfo, num_files, files, title, num_options, options);
+
+    if (job_id && deletefile)
+    {
+      // Delete print files...
+      for (idx = 0; idx < num_files; idx ++)
+        unlink(files[idx]);
+    }
   }
-  else if ((job_id = cupsCreateDestJob(http, dest, dinfo, title ? title : "(stdin)", num_options, options)) == 0)
+  else if (cupsCreateDestJob(http, dest, dinfo, &job_id, title ? title : "(stdin)", num_options, options) != HTTP_STATUS_CONTINUE)
   {
     cupsLangPrintf(stderr, _("%s: Unable to create job: %s"), command, cupsGetErrorString());
   }
   else
   {
-    const char	*format;		// Document format
-
-    if (cupsGetOption("raw", num_options, options))
-      format = CUPS_FORMAT_RAW;
-    else if ((format = cupsGetOption("document-format", num_options, options)) == NULL)
-      format = CUPS_FORMAT_AUTO;
-
-    if (send_document(command, http, dest, dinfo, resource, job_id, /*docname*/NULL, format, /*last_document*/true, 0))
+    if (send_document(command, http, dest, dinfo, job_id, /*docname*/NULL, cupsGetOption("document-format", num_options, options), /*last_document*/true, 0))
       job_id = 0;
   }
 
@@ -472,8 +484,8 @@ static http_t *				// O - HTTP connection or `NULL` on error
 connect_dest(const char   *command,	// I - Command name
              const char   *printer,	// I - Printer or `NULL` for default
              const char   *instance,	// I - Instance or `NULL` for primary
-             cups_dest_t  *dest,	// O - Destination or `NULL` on error
-             cups_dinfo_t *dinfo,	// O - Destination information or `NULL` on error
+             cups_dest_t  **dest,	// O - Destination or `NULL` on error
+             cups_dinfo_t **dinfo,	// O - Destination information or `NULL` on error
              char         *resource,	// I - Resource buffer
              size_t       resourcesize)	// I - Size of resource buffer
 {
@@ -495,14 +507,14 @@ connect_dest(const char   *command,	// I - Command name
   }
   else if ((http = cupsConnectDest(*dest, CUPS_DEST_FLAGS_NONE, 30000, /*cancel*/NULL, resource, resourcesize, /*cb*/NULL, /*user_data*/NULL)) == NULL)
   {
-    cupsLangPrintf(stderr, _("%s: Unable to connect to '%s' - %s"), command, (*dest)->name, cupsGetErrorString());
+    cupsLangPrintf(stderr, _("%s: Unable to connect to '%s': %s"), command, (*dest)->name, cupsGetErrorString());
 
     cupsFreeDests(1, *dest);
     *dest = NULL;
   }
   else if ((*dinfo = cupsCopyDestInfo(http, *dest)) == NULL)
   {
-    cupsLangPrintf(stderr, _("%s: Unable to get information on '%s' - %s"), command, (*dest)->name, cupsGetErrorString());
+    cupsLangPrintf(stderr, _("%s: Unable to get information on '%s': %s"), command, (*dest)->name, cupsGetErrorString());
 
     cupsFreeDests(1, *dest);
     *dest = NULL;
@@ -534,7 +546,7 @@ print_files(const char    *command,	// I - Command name
   int		job_id;			// Job ID
 
 
-  if ((job_id = cupsCreateDestJob(http, dest, dinfo, title, num_options, options)) == 0)
+  if (cupsCreateDestJob(http, dest, dinfo, &job_id, title, num_options, options) != HTTP_STATUS_CONTINUE)
   {
     cupsLangPrintf(stderr, _("%s: Unable to create job: %s"), command, cupsGetErrorString());
     return (0);
@@ -549,7 +561,7 @@ print_files(const char    *command,	// I - Command name
     if ((fd = open(files[i], O_RDONLY)) < 0)
     {
       cupsLangPrintf(stderr, _("%s: Unable to open '%s': %s"), command, files[i], strerror(errno));
-      cupsCancelDestJob(http, dest, dinfo, job_id);
+      cupsCancelDestJob(http, dest, job_id);
       return (0);
     }
 
@@ -564,7 +576,7 @@ print_files(const char    *command,	// I - Command name
 
     if (status)
     {
-      cupsCancelDestJob(http, dest, dinfo, job_id);
+      cupsCancelDestJob(http, dest, job_id);
       return (0);
     }
   }
@@ -606,14 +618,14 @@ send_document(
   {
     cupsLangPrintf(stderr, _("%s: Unable to spool document file."), command);
     cupsFinishDestDocument(http, dest, dinfo);
-    cupsCancelDestJob(http, dest, dinfo, job_id);
+    cupsCancelDestJob(http, dest, job_id);
     return (1);
   }
 
   if (cupsFinishDestDocument(http, dest, dinfo) >= IPP_STATUS_ERROR_BAD_REQUEST)
   {
     cupsLangPrintf(stderr, _("%s: %s"), command, cupsGetErrorString());
-    cupsCancelDestJob(http, dest, dinfo, job_id);
+    cupsCancelDestJob(http, dest, job_id);
     return (1);
   }
 
@@ -642,7 +654,7 @@ set_job_attrs(
   if (num_options == 0)
     return (0);
 
-  request = ippNewRequest(IPP_SET_JOB_ATTRIBUTES);
+  request = ippNewRequest(IPP_OP_SET_JOB_ATTRIBUTES);
 
   ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, cupsGetOption("printer-uri-supported", dest->num_options, dest->options));
   ippAddInteger(request, IPP_TAG_OPERATION, IPP_TAG_INTEGER, "job-id", job_id);
