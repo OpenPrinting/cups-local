@@ -17,6 +17,7 @@
 // Local functions...
 //
 
+static bool	list_dest(bool *long_status, cups_dest_flags_t flags, cups_dest_t *dest);
 static int	show_accepting(const char *command, size_t num_dests, cups_dest_t *dests, cups_array_t *printers);
 static int	show_classes(const char *command, cups_array_t *printers);
 static void	show_default(const char *command, size_t num_dests, cups_dest_t *dests);
@@ -25,7 +26,7 @@ static int	show_jobs(const char *command, size_t num_dests, cups_dest_t *dests, 
 static int	show_printers(const char *command, size_t num_dests, cups_dest_t *dests, cups_array_t *printers, bool long_status);
 static bool	show_scheduler(void);
 static char	*strdate(char *buf, size_t bufsize, time_t timeval);
-static void	update_dests(const char *command, size_t &num_dests, cups_dest_t **dests);
+static void	update_dests(const char *command, size_t *num_dests, cups_dest_t **dests);
 static int	usage(FILE *out, const char *command);
 
 
@@ -89,13 +90,13 @@ main(int  argc,				// I - Number of command-line arguments
 
 	      if (opt[1] != '\0')
 	      {
-		list = cupsNewStrings(opt + 1, ',');
+		list = cupsArrayNewStrings(opt + 1, ',');
 	        opt += strlen(opt) - 1;
 	      }
 	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
 	      {
 		i ++;
-		list = cupsNewStrings(argv[i], ',');
+		list = cupsArrayNewStrings(argv[i], ',');
 	      }
 	      else
 	      {
@@ -112,13 +113,13 @@ main(int  argc,				// I - Number of command-line arguments
 
 	      if (opt[1] != '\0')
 	      {
-	        list = cupsNewStrings(opt + 1, ',');
+	        list = cupsArrayNewStrings(opt + 1, ',');
 	        opt += strlen(opt) - 1;
 	      }
 	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
 	      {
 		i ++;
-		list = cupsNewStrings(argv[i], ',');
+		list = cupsArrayNewStrings(argv[i], ',');
 	      }
 	      else
 	      {
@@ -148,33 +149,7 @@ main(int  argc,				// I - Number of command-line arguments
 	  case 'e' : // -e         List destinations
 	      op = 'e';
 
-	      cupsEnumDests(CUPS_DEST_FLAGS_NONE, 10000, /*cancel*/NULL, (cups_ptype_t)0, (cups_ptype_t)0, list_dest, &long_status);
-
-#if 0
-	      for (j = num_temp, dest = temp; j > 0; j --, dest ++)
-	      {
-		if (dest->instance)
-		  printf("%s/%s", dest->name, dest->instance);
-		else
-		  fputs(dest->name, stdout);
-
-		if (long_status)
-		{
-		  const char *printer_uri_supported = cupsGetOption("printer-uri-supported", dest->num_options, dest->options);
-		  const char *printer_is_temporary = cupsGetOption("printer-is-temporary", dest->num_options, dest->options);
-		  const char *type = "network";
-
-		  if (printer_is_temporary && !strcmp(printer_is_temporary, "true"))
-		    type = "temporary";
-		  else if (printer_uri_supported)
-		    type = "permanent";
-
-		  printf(" %s %s %s\n", type, printer_uri_supported ? printer_uri_supported : "none", cupsGetOption("device-uri", dest->num_options, dest->options));
-		}
-		else
-		  putchar('\n');
-	      }
-#endif // 0
+	      cupsEnumDests(CUPS_DEST_FLAGS_NONE, 10000, /*cancel*/NULL, (cups_ptype_t)0, (cups_ptype_t)0, (cups_dest_cb_t)list_dest, &long_status);
               break;
 
 	  case 'H' : // -H         Show server and port
@@ -187,9 +162,6 @@ main(int  argc,				// I - Number of command-line arguments
 	      break;
 
 	  case 'h' : // -h SERVER  Connect to host
-	      httpClose(http);
-	      http = NULL;
-
 	      if (opt[1] != '\0')
 	      {
 		cupsSetServer(opt + 1);
@@ -214,13 +186,13 @@ main(int  argc,				// I - Number of command-line arguments
 
 	      if (opt[1])
 	      {
-		list = cupsNewStrings(opt + 1, ',');
+		list = cupsArrayNewStrings(opt + 1, ',');
 	        opt += strlen(opt) - 1;
 	      }
 	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
 	      {
 		i ++;
-		list = cupsNewStrings(argv[i], ',');
+		list = cupsArrayNewStrings(argv[i], ',');
 	      }
 	      else
 	      {
@@ -238,13 +210,13 @@ main(int  argc,				// I - Number of command-line arguments
 	        // -P DESTINATIONS Show printer status and jobs
 		if (opt[1])
 		{
-		  list = cupsNewStrings(opt + 1, ',');
+		  list = cupsArrayNewStrings(opt + 1, ',');
 		  opt += strlen(opt) - 1;
 		}
 		else if ((i + 1) < argc && argv[i + 1][0] != '-')
 		{
 		  i ++;
-		  list = cupsNewStrings(argv[i], ',');
+		  list = cupsArrayNewStrings(argv[i], ',');
 		}
 		else
 		{
@@ -253,7 +225,7 @@ main(int  argc,				// I - Number of command-line arguments
 		}
 
 		update_dests(command, &num_dests, &dests);
-		status |= show_jobs(command, num_dests, dests, list, /*users*/NULL, long_status, ranking, which_jobs);
+		status |= show_jobs(command, num_dests, dests, list, /*users*/NULL, long_status, show_ranking, which_jobs);
 		cupsArrayDelete(list);
 	      }
 	      else
@@ -268,13 +240,13 @@ main(int  argc,				// I - Number of command-line arguments
 
 	      if (opt[1] != '\0')
 	      {
-		list = cupsNewStrings(opt + 1, ',');
+		list = cupsArrayNewStrings(opt + 1, ',');
 	        opt += strlen(opt) - 1;
 	      }
 	      else if ((i + 1) < argc && argv[i + 1][0] != '-')
 	      {
 		i ++;
-		list = cupsNewStrings(argv[i], ',');
+		list = cupsArrayNewStrings(argv[i], ',');
 	      }
 	      else
 	      {
@@ -439,7 +411,7 @@ main(int  argc,				// I - Number of command-line arguments
   if (!op)
   {
     list = cupsArrayNewStrings(NULL, ',');
-    cupsArrayAdd(list, cupsGetUser());
+    cupsArrayAdd(list, (void *)cupsGetUser());
 
     update_dests(command, &num_dests, &dests);
     status |= show_jobs(command, num_dests, dests, /*printers*/NULL, list, long_status, show_ranking, which_jobs);
@@ -447,6 +419,57 @@ main(int  argc,				// I - Number of command-line arguments
   }
 
   return (status);
+}
+
+
+//
+// 'list_dest()' - List a destination found via enumeration...
+//
+
+static bool				// O - `true` to continue
+list_dest(
+    bool              *long_status,	// I - User data (unused)
+    cups_dest_flags_t flags,		// I - Flags (unused)
+    cups_dest_t       *dest)		// I - Destination
+{
+  (void)flags;
+
+  if (*long_status)
+  {
+    const char *printer_uri_supported;	// "printer-uri-supported" value
+    const char *printer_is_temporary;	// "printer-is-temporary" value
+    const char *device_uri;		// "[smi-]device-uri" value
+    const char *type = "network";	// Type of queue
+
+    if ((printer_uri_supported = cupsGetOption("printer-uri-supported", dest->num_options, dest->options)) == NULL)
+      printer_uri_supported = "none";
+
+    if ((printer_is_temporary = cupsGetOption("printer-is-temporary", dest->num_options, dest->options)) != NULL && !strcmp(printer_is_temporary, "true"))
+      type = "temporary";
+    else if (printer_uri_supported)
+      type = "permanent";
+
+    if ((device_uri = cupsGetOption("smi55357-device-uri", dest->num_options, dest->options)) == NULL)
+    {
+      if ((device_uri = cupsGetOption("device-uri", dest->num_options, dest->options)) == NULL)
+        device_uri = "file:///dev/null";
+    }
+
+    if (dest->instance)
+      cupsLangPrintf(stdout, "%s/%s %s %s %s\n", dest->name, dest->instance, type, printer_uri_supported, device_uri);
+    else
+      cupsLangPrintf(stdout, "%s %s %s %s\n", dest->name, type, printer_uri_supported, device_uri);
+  }
+  else if (dest->instance)
+  {
+    cupsLangPrintf(stdout, "%s/%s", dest->name, dest->instance);
+  }
+  else
+  {
+    cupsLangPuts(stdout, dest->name);
+  }
+
+  return (true);
 }
 
 
@@ -460,114 +483,45 @@ show_accepting(const char   *command,	// I - Command name
 	       cups_dest_t  *dests,	// I - User-defined destinations
 	       cups_array_t *printers)	// I - Destinations to show
 {
-  int		ret = 0;		// Return value
-  size_t	i, j,			// Looping vars
-		count;			// Number of values
+  size_t	i;			// Looping vars
   cups_dest_t	*dest;			// Current destination
 
 
   // Loop through the available destinations and report on those that match...
   for (i = num_dests, dest = dests; i > 0; i --, dest ++)
   {
-    const char	*value,				// Temporary value
-		*printer_info;			// "printer-info" value
-    bool	printer_is_accepting_jobs,	// "printer-is-accepting-jobs" value
-    const char	*printer_location,		// "printer-location" value
-		*printer_make_and_model;	// "printer-make-and-model" value
-    ipp_pstate_t printer_state;			// "printer-state" value
-    char	printer_state_change_date[255];	// "printer-state-change-date-time" string
-    time_t	printer_state_change_time;	// "printer-state-change-date-time" value
-    const char	*printer_state_message;		// "printer-state-message" value
-    cups_array_t *printer_state_reasons;	// "printer-state-reasons" value
-    cups_ptype_t printer_type;			// "printer-type" value
+    const char	*value;			// Temporary value
+    bool	is_accepting_jobs;	// "printer-is-accepting-jobs" value
+    char	state_change_date[255];	// "printer-state-change-date-time" string
+    time_t	state_change_time;	// "printer-state-change-date-time" value
+    const char	*state_message;		// "printer-state-message" value
 
     // Filter out printers we don't care about...
     if (dest->instance || (cupsArrayGetCount(printers) > 0 && !cupsArrayFind(printers, dest->name)))
       continue;
 
     // Grab values and report them...
-    value                     = cupsGetOption("printer-is-accepting-jobs", dest->num_options, dest->options);
-    printer_is_accepting_jobs = value && !strcmp(value, "true");
-    printer_location          = cupsGetOption("printer-location", dest->num_options, dest->options);
+    value             = cupsGetOption("printer-is-accepting-jobs", dest->num_options, dest->options);
+    is_accepting_jobs = value && !strcmp(value, "true");
+    if ((state_change_time = (time_t)cupsGetIntegerOption("printer-state-change-date-time", dest->num_options, dest->options)) == (time_t)LONG_MIN)
+      state_change_time = (time_t)cupsGetIntegerOption("printer-state-change-time", dest->num_options, dest->options);
+    state_message = cupsGetOption("printer-state-message", dest->num_options, dest->options);
 
-      printer   = NULL;
-      message   = NULL;
-      accepting = 1;
-      ptime     = 0;
+    strdate(state_change_date, sizeof(state_change_date), state_change_time);
 
-      while (attr != NULL && attr->group_tag == IPP_TAG_PRINTER)
-      {
-        if (!strcmp(attr->name, "printer-name") &&
-	    attr->value_tag == IPP_TAG_NAME)
-	  printer = attr->values[0].string.text;
-        else if (!strcmp(attr->name, "printer-state-change-time") &&
-	         attr->value_tag == IPP_TAG_INTEGER)
-	  ptime = (time_t)attr->values[0].integer;
-        else if (!strcmp(attr->name, "printer-state-message") &&
-	         attr->value_tag == IPP_TAG_TEXT)
-	  message = attr->values[0].string.text;
-        else if (!strcmp(attr->name, "printer-is-accepting-jobs") &&
-	         attr->value_tag == IPP_TAG_BOOLEAN)
-	  accepting = attr->values[0].boolean;
-
-        attr = attr->next;
-      }
-
-     /*
-      * See if we have everything needed...
-      */
-
-      if (printer == NULL)
-      {
-        if (attr == NULL)
-	  break;
-	else
-          continue;
-      }
-
-     /*
-      * Display the printer entry if needed...
-      */
-
-      if (match_list(printers, printer))
-      {
-        _cupsStrDate(printer_state_time, sizeof(printer_state_time), ptime);
-
-        if (accepting)
-	  cupsLangPrintf(stdout, _("%s accepting requests since %s"),
-			  printer, printer_state_time);
-	else
-	{
-	  cupsLangPrintf(stdout, _("%s not accepting requests since %s -"),
-			  printer, printer_state_time);
-	  cupsLangPrintf(stdout, _("\t%s"),
-			  (message && *message) ?
-			      message : "reason unknown");
-        }
-
-        for (i = 0; i < num_dests; i ++)
-	  if (!_cups_strcasecmp(dests[i].name, printer) && dests[i].instance)
-	  {
-            if (accepting)
-	      cupsLangPrintf(stdout, _("%s/%s accepting requests since %s"),
-			      printer, dests[i].instance, printer_state_time);
-	    else
-	    {
-	      cupsLangPrintf(stdout,
-	                      _("%s/%s not accepting requests since %s -"),
-			      printer, dests[i].instance, printer_state_time);
-	      cupsLangPrintf(stdout, _("\t%s"),
-	        	      (message && *message) ?
-			          message : "reason unknown");
-            }
-	  }
-      }
-
-      if (attr == NULL)
-        break;
+    if (is_accepting_jobs)
+    {
+      cupsLangPrintf(stdout, _("%s accepting requests since %s"), dest->name, state_change_date);
     }
+    else
+    {
+      cupsLangPrintf(stdout, _("%s not accepting requests since %s -"), dest->name, state_change_date);
 
-    ippDelete(response);
+      if (state_message && *state_message)
+      	cupsLangPrintf(stdout, "\t%s", state_message);
+      else
+        cupsLangPuts(stdout, _("\treason unknown"));
+    }
   }
 
   return (0);
@@ -582,6 +536,11 @@ static int				// O - 0 on success, 1 on fail
 show_classes(const char   *command,	// I - Command name
 	     cups_array_t *printers)	// I - Destinations to show
 {
+  (void)command;
+  (void)printers;
+  return (0);
+
+#if 0
   int		i;			// Looping var
   ipp_t		*request,		// IPP Request
 		*response,		// IPP Response
@@ -793,6 +752,7 @@ show_classes(const char   *command,	// I - Command name
   }
 
   return (0);
+#endif // 0
 }
 
 
@@ -805,11 +765,12 @@ show_default(const char  *command,	// I - Command name
 	     size_t      num_dests,	// I - Number of user-defined dests
 	     cups_dest_t *dests)	// I - User-defined destinations
 {
+  cups_dest_t	*dest;			// Default printer
   const char	*printer,		// Printer name
 		*envname;		// Environment variable name
 
 
-  if (dest)
+  if ((dest = cupsGetDest(/*printer*/NULL, /*instance*/NULL, num_dests, dests)) != NULL)
   {
     if (dest->instance)
       cupsLangPrintf(stdout, _("system default destination: %s/%s"), dest->name, dest->instance);
@@ -828,7 +789,7 @@ show_default(const char  *command,	// I - Command name
       printer = NULL;
 
     if (printer)
-      cupsLangPrintf(stdout, _("%s: %s environment variable names non-existent destination '%s'."), envname, printer);
+      cupsLangPrintf(stdout, _("%s: %s environment variable names non-existent destination '%s'."), command, envname, printer);
     else
       cupsLangPuts(stdout, _("no system default destination"));
   }
@@ -845,165 +806,27 @@ show_devices(const char   *command,	// I - Command name
 	     cups_dest_t  *dests,	// I - User-defined destinations
 	     cups_array_t *printers)	// I - Destinations to show
 {
-  int		i;			// Looping var
-  ipp_t		*request,		// IPP Request
-		*response;		// IPP Response
-  ipp_attribute_t *attr;		// Current attribute
-  const char	*printer,		// Printer name
-		*uri,			// Printer URI
-		*device;		// Printer device URI
-  static const char *pattrs[] =		// Attributes we need for printers...
-		{
-		  "printer-name",
-		  "printer-uri-supported",
-		  "device-uri"
-		};
+  size_t	i;			// Looping var
+  cups_dest_t	*dest;			// Current destination
 
 
-  if (printers != NULL && !strcmp(printers, "all"))
-    printers = NULL;
-
- /*
-  * Build a IPP_OP_CUPS_GET_PRINTERS request, which requires the following
-  * attributes:
-  *
-  *    attributes-charset
-  *    attributes-natural-language
-  *    requested-attributes
-  *    requesting-user-name
-  */
-
-  request = ippNewRequest(IPP_OP_CUPS_GET_PRINTERS);
-
-  ippAddStrings(request, IPP_TAG_OPERATION, IPP_TAG_KEYWORD,
-                "requested-attributes", sizeof(pattrs) / sizeof(pattrs[0]),
-		NULL, pattrs);
-
-  ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name",
-               NULL, cupsGetUser());
-
- /*
-  * Do the request and get back a response...
-  */
-
-  response = cupsDoRequest(CUPS_HTTP_DEFAULT, request, "/");
-
-  if (cupsGetError() == IPP_STATUS_ERROR_SERVICE_UNAVAILABLE)
+  // Loop through the available destinations and report on those that match...
+  for (i = num_dests, dest = dests; i > 0; i --, dest ++)
   {
-    cupsLangPrintf(stderr, _("%s: Scheduler is not running."), "lpstat");
-    ippDelete(response);
-    return (1);
-  }
-  if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST ||
-      cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
-  {
-    cupsLangPrintf(stderr,
-		    _("%s: Error - add '/version=1.1' to server name."),
-		    "lpstat");
-    ippDelete(response);
-    return (1);
-  }
-  else if (cupsGetError() > IPP_STATUS_OK_CONFLICTING)
-  {
-    cupsLangPrintf(stderr, "lpstat: %s", cupsGetErrorString());
-    ippDelete(response);
-    return (1);
-  }
+    const char	*device_uri;			// "device-uri" value
 
-  if (response)
-  {
-   /*
-    * Loop through the printers returned in the list and display
-    * their devices...
-    */
+    // Filter out printers we don't care about...
+    if (dest->instance || (cupsArrayGetCount(printers) > 0 && !cupsArrayFind(printers, dest->name)))
+      continue;
 
-    for (attr = response->attrs; attr != NULL; attr = attr->next)
-    {
-     /*
-      * Skip leading attributes until we hit a job...
-      */
+    // Grab values and report them...
+    if ((device_uri = cupsGetOption("smi55357-device-uri", dest->num_options, dest->options)) == NULL)
+      device_uri = cupsGetOption("device-uri", dest->num_options, dest->options);
 
-      while (attr != NULL && attr->group_tag != IPP_TAG_PRINTER)
-        attr = attr->next;
-
-      if (attr == NULL)
-        break;
-
-     /*
-      * Pull the needed attributes from this job...
-      */
-
-      printer = NULL;
-      device  = NULL;
-      uri     = NULL;
-
-      while (attr != NULL && attr->group_tag == IPP_TAG_PRINTER)
-      {
-        if (!strcmp(attr->name, "printer-name") &&
-	    attr->value_tag == IPP_TAG_NAME)
-	  printer = attr->values[0].string.text;
-
-        if (!strcmp(attr->name, "printer-uri-supported") &&
-	    attr->value_tag == IPP_TAG_URI)
-	  uri = attr->values[0].string.text;
-
-        if (!strcmp(attr->name, "device-uri") &&
-	    attr->value_tag == IPP_TAG_URI)
-	  device = attr->values[0].string.text;
-
-        attr = attr->next;
-      }
-
-     /*
-      * See if we have everything needed...
-      */
-
-      if (printer == NULL)
-      {
-        if (attr == NULL)
-	  break;
-	else
-          continue;
-      }
-
-     /*
-      * Display the printer entry if needed...
-      */
-
-      if (match_list(printers, printer))
-      {
-        if (device == NULL)
-          cupsLangPrintf(stdout, _("device for %s: %s"),
-	                  printer, uri);
-        else if (!strncmp(device, "file:", 5))
-          cupsLangPrintf(stdout, _("device for %s: %s"),
-	                  printer, device + 5);
-        else
-          cupsLangPrintf(stdout, _("device for %s: %s"),
-	                  printer, device);
-
-        for (i = 0; i < num_dests; i ++)
-        {
-	  if (!_cups_strcasecmp(printer, dests[i].name) && dests[i].instance)
-	  {
-            if (device == NULL)
-              cupsLangPrintf(stdout, _("device for %s/%s: %s"),
-	                      printer, dests[i].instance, uri);
-            else if (!strncmp(device, "file:", 5))
-              cupsLangPrintf(stdout, _("device for %s/%s: %s"),
-	                      printer, dests[i].instance, device + 5);
-            else
-              cupsLangPrintf(stdout, _("device for %s/%s: %s"),
-	                      printer, dests[i].instance, device);
-	  }
-	}
-      }
-
-      if (attr == NULL)
-        break;
-    }
-
-    ippDelete(response);
+    if (device_uri)
+      cupsLangPrintf(stdout, _("device for %s: %s"), dest->name, device_uri);
+    else
+      cupsLangPrintf(stdout, _("device for %s: unknown"), dest->name);
   }
 
   return (0);
@@ -1016,7 +839,7 @@ show_devices(const char   *command,	// I - Command name
 
 static int				// O - Exit status
 show_jobs(const char   *command,	// I - Command name
-	  int          num_dests,	// I - Number of destinationss
+	  size_t       num_dests,	// I - Number of destinationss
 	  cups_dest_t  *dests,		// I - Destinations
 	  cups_array_t *printers,	// I - Destinations to show
           cups_array_t *users,		// I - Users
@@ -1024,205 +847,164 @@ show_jobs(const char   *command,	// I - Command name
           bool         show_ranking,	// I - Show job ranking?
 	  const char   *which_jobs)	// I - Show which jobs?
 {
+  int		ret = 0;		// Return value
   size_t	i;			// Looping var
+  cups_dest_t	*dest;			// Current destination
+  http_t	*http;			// HTTP connection
+  char		resource[1024];		// Resource path
   ipp_t		*request,		// IPP Request
 		*response;		// IPP Response
-  ipp_attribute_t *attr,		// Current attribute
-		*reasons;		// Job state reasons attribute
-  const char	*dest,			// Pointer into job-printer-uri
-		*username,		// Pointer to job-originating-user-name
-		*message,		// Pointer to job-printer-state-message
-		*time_at;		// time-at-xxx attribute name to use
+  ipp_attribute_t *attr;		// Current attribute
+  const char	*name;			// Attribute name
+  ipp_tag_t	value_tag;		// Value syntax
+  const char	*date_time_at_attr,	// "date-time-at-xxx" attribute name to use
+		*time_at_attr;		// "time-at-xxx" attribute name to use
   int		rank,			// Rank in queue
-		jobid,			// job-id
-		size;			// job-k-octets
-  time_t	jobtime;		// time-at-creation
-  char		temp[255],		// Temporary buffer
-		date[255];		// Date buffer
+		job_id,			// "job-id" value
+		k_octets;		// "job-k-octets" value
+  ipp_attribute_t *state_reasons;	// "job-state-reasons" value
+  time_t	time_at;		// "[date-]time-at-xxx" value
+  const char	*username;		// Pointer to job-originating-user-name
+  char		dest_job_id[255],	// DEST-JOBID string
+		time_at_date[255];	// "[date-]time-at-xxx" string
   static const char * const jattrs[] =	// Attributes we need for jobs...
   {
+    "date-time-at-creation",
+    "date-time-at-completed",
     "job-id",
     "job-k-octets",
     "job-name",
     "job-originating-user-name",
-    "job-printer-state-message",
-    "job-printer-uri",
     "job-state-reasons",
     "time-at-creation",
     "time-at-completed"
   };
 
 
-  if (dests != NULL && !strcmp(dests, "all"))
-    dests = NULL;
-
-  // Get jobs list...
-  request = ippNewRequest(IPP_OP_GET_JOBS);
-
-  ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, "ipp://localhost/");
-  ippAddStrings(request, IPP_TAG_OPERATION, IPP_CONST_TAG(IPP_TAG_KEYWORD), "requested-attributes", sizeof(jattrs) / sizeof(jattrs[0]), NULL, jattrs);
-  ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name", NULL, cupsGetUser());
-  ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_KEYWORD, "which-jobs", NULL, which_jobs);
-
-  response = cupsDoRequest(CUPS_HTTP_DEFAULT, request, "/");
-
-  if (cupsGetError() == IPP_STATUS_ERROR_SERVICE_UNAVAILABLE)
+  // Loop through the available destinations and report on those that match...
+  for (i = num_dests, dest = dests; i > 0; i --, dest ++)
   {
-    cupsLangPrintf(stderr, _("%s: Scheduler is not running."), "lpstat");
-    ippDelete(response);
-    return (1);
-  }
-  if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST ||
-      cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
-  {
-    cupsLangPrintf(stderr,
-		    _("%s: Error - add '/version=1.1' to server name."),
-		    "lpstat");
-    ippDelete(response);
-    return (1);
-  }
-  else if (cupsGetError() > IPP_STATUS_OK_CONFLICTING)
-  {
-    cupsLangPrintf(stderr, "lpstat: %s", cupsGetErrorString());
-    ippDelete(response);
-    return (1);
-  }
+    // Filter out printers we don't care about...
+    if (dest->instance || (cupsArrayGetCount(printers) > 0 && !cupsArrayFind(printers, dest->name)))
+      continue;
 
-  if (response)
-  {
-   /*
-    * Loop through the job list and display them...
-    */
+    // Connect to this printer...
+    if ((http = cupsConnectDest(dest, CUPS_DEST_FLAGS_NONE, 30000, /*cancel*/NULL, resource, sizeof(resource), /*cb*/NULL, /*user_data*/NULL)) == NULL)
+    {
+      cupsLangPrintf(stderr, _("%s: Unable to connect to '%s': %s"), command, dest->name, cupsGetErrorString());
+      ret = 1;
+      continue;
+    }
 
-    if (!strcmp(which, "aborted") ||
-        !strcmp(which, "canceled") ||
-        !strcmp(which, "completed"))
-      time_at = "time-at-completed";
+    // Get jobs list...
+    request = ippNewRequest(IPP_OP_GET_JOBS);
+
+    ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, cupsGetOption("printer-uri-supported", dest->num_options, dest->options));
+    ippAddStrings(request, IPP_TAG_OPERATION, IPP_CONST_TAG(IPP_TAG_KEYWORD), "requested-attributes", sizeof(jattrs) / sizeof(jattrs[0]), NULL, jattrs);
+    ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name", NULL, cupsGetUser());
+    ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_KEYWORD, "which-jobs", NULL, which_jobs);
+
+    response = cupsDoRequest(http, request, resource);
+
+    // Loop through the job list and display them...
+    if (!strcmp(which_jobs, "completed"))
+    {
+      date_time_at_attr = "date-time-at-completed";
+      time_at_attr      = "time-at-completed";
+    }
     else
-      time_at = "time-at-creation";
+    {
+      date_time_at_attr = "date-time-at-creation";
+      time_at_attr      = "time-at-creation";
+    }
 
     rank = -1;
 
-    for (attr = response->attrs; attr != NULL; attr = attr->next)
+    attr = ippGetFirstAttribute(response);
+    while (attr)
     {
-     /*
-      * Skip leading attributes until we hit a job...
-      */
+      // Skip leading attributes until we hit a job...
+      while (attr && ippGetGroupTag(attr) != IPP_TAG_JOB)
+        attr = ippGetNextAttribute(response);
 
-      while (attr != NULL && attr->group_tag != IPP_TAG_JOB)
-        attr = attr->next;
-
-      if (attr == NULL)
+      if (!attr)
         break;
 
-     /*
-      * Pull the needed attributes from this job...
-      */
+      // Pull the needed attributes from this job...
+      job_id        = 0;
+      k_octets      = 0;
+      username      = NULL;
+      time_at       = 0;
+      state_reasons = NULL;
 
-      jobid    = 0;
-      size     = 0;
-      username = NULL;
-      dest     = NULL;
-      jobtime  = 0;
-      message  = NULL;
-      reasons  = NULL;
-
-      while (attr != NULL && attr->group_tag == IPP_TAG_JOB)
+      while (attr && ippGetGroupTag(attr) == IPP_TAG_JOB)
       {
-        if (!strcmp(attr->name, "job-id") &&
-	    attr->value_tag == IPP_TAG_INTEGER)
-	  jobid = attr->values[0].integer;
-        else if (!strcmp(attr->name, "job-k-octets") &&
-		 attr->value_tag == IPP_TAG_INTEGER)
-	  size = attr->values[0].integer;
-        else if (!strcmp(attr->name, time_at) && attr->value_tag == IPP_TAG_INTEGER)
-	  jobtime = attr->values[0].integer;
-        else if (!strcmp(attr->name, "job-printer-state-message") &&
-	         attr->value_tag == IPP_TAG_TEXT)
-	  message = attr->values[0].string.text;
-        else if (!strcmp(attr->name, "job-printer-uri") &&
-	         attr->value_tag == IPP_TAG_URI)
-	{
-	  if ((dest = strrchr(attr->values[0].string.text, '/')) != NULL)
-	    dest ++;
-        }
-        else if (!strcmp(attr->name, "job-originating-user-name") &&
-	         attr->value_tag == IPP_TAG_NAME)
-	  username = attr->values[0].string.text;
-        else if (!strcmp(attr->name, "job-state-reasons") &&
-	         attr->value_tag == IPP_TAG_KEYWORD)
-	  reasons = attr;
+        name      = ippGetName(attr);
+        value_tag = ippGetValueTag(attr);
 
-        attr = attr->next;
+        if (!strcmp(name, "job-id") && value_tag == IPP_TAG_INTEGER)
+	  job_id = ippGetInteger(attr, 0);
+        else if (!strcmp(name, "job-k-octets") && value_tag == IPP_TAG_INTEGER)
+	  k_octets = ippGetInteger(attr, 0);
+        else if (!strcmp(name, date_time_at_attr) && value_tag == IPP_TAG_DATE)
+	  time_at = ippDateToTime(ippGetDate(attr, 0));
+        else if (!strcmp(name, time_at_attr) && value_tag == IPP_TAG_INTEGER && !time_at)
+	  time_at = (time_t)ippGetInteger(attr, 0);
+        else if (!strcmp(name, "job-originating-user-name") && value_tag == IPP_TAG_NAME)
+	  username = ippGetString(attr, 0, NULL);
+        else if (!strcmp(name, "job-state-reasons") && value_tag == IPP_TAG_KEYWORD)
+	  state_reasons = attr;
+
+        attr = ippGetNextAttribute(response);
       }
 
-     /*
-      * See if we have everything needed...
-      */
+      // See if we have everything needed...
+      if (job_id == 0)
+	continue;
 
-      if (dest == NULL || jobid == 0)
-      {
-        if (attr == NULL)
-	  break;
-	else
-          continue;
-      }
-
-     /*
-      * Display the job...
-      */
-
+      // Display the job...
       rank ++;
 
-      if (match_list(dests, dest) && match_list(users, username))
+      if (cupsArrayGetCount(users) > 0 && !cupsArrayFind(users, (void *)username))
+        continue;			// This is not the user you are looking for...
+
+      strdate(time_at_date, sizeof(time_at_date), time_at);
+      snprintf(dest_job_id, sizeof(dest_job_id), "%s-%d", dest->name, job_id);
+
+      if (show_ranking)
+	cupsLangPrintf(stdout, _("%3d %-21s %-13s %8.0f %s"), rank, dest_job_id, username ? username : "anonymous", 1024.0 * k_octets, time_at_date);
+      else
+	cupsLangPrintf(stdout, _("%-23s %-13s %8.0f   %s"), dest_job_id, username ? username : "anonymous", 1024.0 * k_octets, time_at_date);
+
+      if (long_status)
       {
-        snprintf(temp, sizeof(temp), "%s-%d", dest, jobid);
-
-	_cupsStrDate(date, sizeof(date), jobtime);
-
-	if (ranking)
-	  cupsLangPrintf(stdout, "%3d %-21s %-13s %8.0f %s",
-			  rank, temp, username ? username : "unknown",
-			  1024.0 * size, date);
-	else
-	  cupsLangPrintf(stdout, "%-23s %-13s %8.0f   %s",
-			  temp, username ? username : "unknown",
-			  1024.0 * size, date);
-	if (long_status)
+	size_t	count;			// Number of reasons
+	if ((count = ippGetCount(state_reasons)) > 0)
 	{
-	  if (message)
-	    cupsLangPrintf(stdout, _("\tStatus: %s"), message);
+	  char		alerts[1024],	// Alerts string
+			*aptr;		// Pointer into alerts string
 
-	  if (reasons)
+	  for (i = 0, aptr = alerts; i < count; i ++)
 	  {
-	    char	alerts[1024],	// Alerts string
-		      *aptr;		// Pointer into alerts string
+	    if (i)
+	      snprintf(aptr, sizeof(alerts) - (size_t)(aptr - alerts), " %s", ippGetString(state_reasons, i, NULL));
+	    else
+	      cupsCopyString(alerts, ippGetString(state_reasons, i, NULL), sizeof(alerts));
 
-	    for (i = 0, aptr = alerts; i < reasons->num_values; i ++)
-	    {
-	      if (i)
-		snprintf(aptr, sizeof(alerts) - (size_t)(aptr - alerts), " %s", reasons->values[i].string.text);
-	      else
-		strlcpy(alerts, reasons->values[i].string.text, sizeof(alerts));
-
-	      aptr += strlen(aptr);
-	    }
-
-	    cupsLangPrintf(stdout, _("\tAlerts: %s"), alerts);
+	    aptr += strlen(aptr);
 	  }
 
-	  cupsLangPrintf(stdout, _("\tqueued for %s"), dest);
+	  cupsLangPrintf(stdout, _("\tAlerts: %s"), alerts);
 	}
-      }
 
-      if (attr == NULL)
-        break;
+	cupsLangPrintf(stdout, _("\tqueued for %s"), dest->name);
+      }
     }
 
     ippDelete(response);
   }
 
-  return (0);
+  return (ret);
 }
 
 
@@ -1232,173 +1014,122 @@ show_jobs(const char   *command,	// I - Command name
 
 static int				// O - Exit status
 show_printers(const char   *command,	// I - Command name
-              int          num_dests,	// I - Number of user-defined dests
+              size_t       num_dests,	// I - Number of user-defined dests
 	      cups_dest_t  *dests,	// I - User-defined destinations
               cups_array_t *printers,	// I - Destinations
               bool         long_status)	// I - Show long status?
 {
   int		ret = 0;		// Return value
-  size_t	i, j,			// Looping vars
-		count;			// Number of values
+  size_t	i, j;			// Looping vars
   cups_dest_t	*dest;			// Current destination
-  http_t	*http;			// Connection to printer
-  char		resource[1024];		// Resource path
-  ipp_t		*request,		// IPP Request
-		*response,		// IPP Response
-		*jobs;			// IPP Get-Jobs response
-  ipp_attribute_t *attr,		// Current attribute
-		*jobattr,		// Current job attribute
-		*job_state_reasons;	// "job-state-reasons" attribute
-  static const char * const jattrs[] =	// Attributes we need for jobs...
-  {
-    "job-id",
-    "job-state"
-  };
 
 
   // Loop through the available destinations and report on those that match...
   for (i = num_dests, dest = dests; i > 0; i --, dest ++)
   {
-    int		job_id = 0;			// Current "job-id" value
-    const char	*printer_uri,			// "printer-uri" value
-		*printer_info,			// "printer-info" value
-		*printer_location,		// "printer-location" value
-		*printer_make_and_model;	// "printer-make-and-model" value
-    ipp_pstate_t printer_state = IPP_PSTATE_STOPPED;
-						// "printer-state" value
-    char	printer_state_change_date[255];	// "printer-state-change-date-time" string
-    time_t	printer_state_change_time;	// "printer-state-change-date-time" value
-    const char	*printer_state_message;		// "printer-state-message" value
-    cups_array_t *printer_state_reasons;	// "printer-state-reasons" value
-    cups_ptype_t printer_type = CUPS_PRINTER_LOCAL;
-						// "printer-type" value
+    int		job_id = 0;		// Current "job-id" value
+    const char	*info,			// "printer-info" value
+		*location,		// "printer-location" value
+		*make_and_model;	// "printer-make-and-model" value
+    ipp_pstate_t state;			// "printer-state" value
+    char	state_change_date[255];	// "printer-state-change-date-time" string
+    time_t	state_change_time;	// "printer-state-change-date-time" value
+    const char	*state_message;		// "printer-state-message" value
+    cups_array_t *state_reasons;	// "printer-state-reasons" value
 
     // Filter out printers we don't care about...
     if (dest->instance || (cupsArrayGetCount(printers) > 0 && !cupsArrayFind(printers, dest->name)))
       continue;
 
-    printer_uri = cupsGetOption("printer-uri-supported", dest->num_options, dest->options);
+    // Grab values and report them...
+    info              = cupsGetOption("printer-info", dest->num_options, dest->options);
+    location          = cupsGetOption("printer-location", dest->num_options, dest->options);
+    make_and_model    = cupsGetOption("printer-make-and-model", dest->num_options, dest->options);
+    state             = (ipp_pstate_t)cupsGetIntegerOption("printer-state", dest->num_options, dest->options);
+    if ((state_change_time = (time_t)cupsGetIntegerOption("printer-state-change-date-time", dest->num_options, dest->options)) == (time_t)LONG_MIN)
+      state_change_time = (time_t)cupsGetIntegerOption("printer-state-change-time", dest->num_options, dest->options);
+    state_message = cupsGetOption("printer-state-message", dest->num_options, dest->options);
+    state_reasons = cupsArrayNewStrings(cupsGetOption("printer-state-reasons", dest->num_options, dest->options), ',');
 
-    // Connect to this printer...
-    if ((http = cupsConnectDest(dest, CUPS_DEST_FLAGS_NONE, 30000, /*cancel*/NULL, resource, resourcesize, /*cb*/NULL, /*user_data*/NULL)) == NULL)
-    {
-      cupsLangPrintf(stderr, _("%s: Unable to connect to '%s': %s"), command, dest->name, cupsGetErrorString());
-      ret = 1;
-      continue;
-    }
-
-    // Get printer attributes...
-    request = ippNewRequest(IPP_OP_GET_PRINTER_ATTRIBUTES);
-
-    ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, printer_uri);
-    ippAddStrings(request, IPP_TAG_OPERATION, IPP_TAG_KEYWORD, "requested-attributes", sizeof(pattrs) / sizeof(pattrs[0]), NULL, pattrs);
-    ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name", NULL, cupsGetUser());
-
-    response = cupsDoRequest(http, request, resource);
-
-    if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST || cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
-    {
-      cupsLangPrintf(stderr, _("%s: Add '/version=1.1' to server name."), command);
-      ippDelete(response);
-      ret = 1;
-      continue;
-    }
-    else if (cupsGetError() > IPP_STATUS_OK_CONFLICTING)
-    {
-      cupsLangPrintf(stderr, _("%s: Unable to get '%s' information: %s"), command, dest->name, cupsGetErrorString());
-      ippDelete(response);
-      ret = 1;
-      continue;
-    }
-
-    // Display its status...
-    for (attr = ippGetFirstAttribute(response); attr; attr = ippGetNextAttribute(response))
-    {
-      // Pull the needed attributes for this printer...
-      const char	*name;		// Attribute name
-      ipp_tag_t		value_tag;	// Attribute syntax
-
-      name      = ippGetName(attr);
-      value_tag = ippGetValueTag(attr);
-
-      if (!strcmp(name, "printer-state") && value_tag == IPP_TAG_ENUM)
-	printer_state = (ipp_pstate_t)ippGetInteger(attr, 0);
-      else if (!strcmp(name, "printer-type") && value_tag == IPP_TAG_ENUM)
-	printer_type = (cups_ptype_t)ippGetInteger(attr, 0);
-      else if (!strcmp(name, "printer-state-message") && value_tag == IPP_TAG_TEXT)
-	printer_state_message = ippGetString(attr, 0, NULL);
-      else if (!strcmp(name, "printer-state-change-date-time") && value_tag == IPP_TAG_DATE)
-	printer_state_change_time = ippDateToTime(ippGetDate(attr, 0));
-      else if (!strcmp(name, "printer-info") && value_tag == IPP_TAG_TEXT)
-	printer_info = ippGetString(attr, 0, NULL);
-      else if (!strcmp(name, "printer-location") && value_tag == IPP_TAG_TEXT)
-	printer_location = ippGetString(attr, 0, NULL);
-      else if (!strcmp(name, "printer-make-and-model") && value_tag == IPP_TAG_TEXT)
-	printer_make_and_model = ippGetString(attr, 0, NULL);
-      else if (!strcmp(name, "printer-state-reasons") && value_tag == IPP_TAG_KEYWORD)
-	printer_state_reasons = attr;
-    }
+    strdate(state_change_date, sizeof(state_change_date), state_change_time);
 
     // If the printer state is `IPP_PSTATE_PROCESSING`, then grab the current job for the printer.
-    if (printer_state == IPP_PSTATE_PROCESSING)
+    if (state == IPP_PSTATE_PROCESSING)
     {
+      http_t	*http;			// Connection to printer
+      char	resource[1024];		// Resource path
+      ipp_t	*request,		// IPP Request
+		*response;		// IPP Response
+      static const char * const jattrs[] =
+      {					// Attributes we need for jobs...
+	"job-id",
+	"job-state"
+      };
+
+      // Connect to this printer...
+      if ((http = cupsConnectDest(dest, CUPS_DEST_FLAGS_NONE, 30000, /*cancel*/NULL, resource, sizeof(resource), /*cb*/NULL, /*user_data*/NULL)) == NULL)
+      {
+	cupsLangPrintf(stderr, _("%s: Unable to connect to '%s': %s"), command, dest->name, cupsGetErrorString());
+	ret = 1;
+	continue;
+      }
+
       request = ippNewRequest(IPP_OP_GET_JOBS);
-      ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, printer_uri);
+      ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, cupsGetOption("printer-uri-supported", dest->num_options, dest->options));
       ippAddStrings(request, IPP_TAG_OPERATION, IPP_CONST_TAG(IPP_TAG_KEYWORD), "requested-attributes", sizeof(jattrs) / sizeof(jattrs[0]), NULL, jattrs);
       ippAddInteger(request, IPP_TAG_OPERATION, IPP_TAG_INTEGER, "limit", 1);
 
-      jobs = cupsDoRequest(http, request, resource);
+      response = cupsDoRequest(http, request, resource);
 
-      if (ippGetInteger(ippFindAttribute(jobs, "job-state", IPP_TAG_ENUM), 0) == IPP_JSTATE_PROCESSING)
-        job_id = ippGetInteger(ippFindAttribute(jobs, "job-id", IPP_TAG_INTEGER), 0);
+      if (ippGetInteger(ippFindAttribute(response, "job-state", IPP_TAG_ENUM), 0) == IPP_JSTATE_PROCESSING)
+        job_id = ippGetInteger(ippFindAttribute(response, "job-id", IPP_TAG_INTEGER), 0);
 
-      ippDelete(jobs);
+      ippDelete(response);
+      httpClose(http);
     }
 
     // Display it...
-    strdate(printer_state_change_date, sizeof(printer_state_change_date), printer_state_change_time);
-
-    switch (printer_state)
+    switch (state)
     {
       case IPP_PSTATE_IDLE :
-	  if (ippContainsString(printer_state_reasons, "hold-new-jobs"))
-	    cupsLangPrintf(stdout, _("printer %s is holding new jobs.  enabled since %s"), dest->name, printer_state_change_date);
+	  if (cupsArrayFind(state_reasons, (void *)"hold-new-jobs"))
+	    cupsLangPrintf(stdout, _("printer %s is holding new jobs.  enabled since %s"), dest->name, state_change_date);
 	  else
-	    cupsLangPrintf(stdout, _("printer %s is idle.  enabled since %s"), dest->name, printer_state_change_date);
+	    cupsLangPrintf(stdout, _("printer %s is idle.  enabled since %s"), dest->name, state_change_date);
 	  break;
       case IPP_PSTATE_PROCESSING :
-	  cupsLangPrintf(stdout, _("printer %s now printing %s-%d.  enabled since %s"), dest->name, dest->name, job_id, printer_state_change_date);
+	  cupsLangPrintf(stdout, _("printer %s now printing %s-%d.  enabled since %s"), dest->name, dest->name, job_id, state_change_date);
 	  break;
       case IPP_PSTATE_STOPPED :
-	  cupsLangPrintf(stdout, _("printer %s disabled since %s -"), dest->name, printer_state_change_date);
+	  cupsLangPrintf(stdout, _("printer %s disabled since %s -"), dest->name, state_change_date);
 	  break;
     }
 
-    if ((printer_state_message && *printer_state_message) || printer_state == IPP_PSTATE_STOPPED)
+    if ((state_message && *state_message) || state == IPP_PSTATE_STOPPED)
     {
-      if (printer_state_message && *printer_state_message)
-	cupsLangPrintf(stdout, "\t%s", printer_state_message);
+      if (state_message && *state_message)
+	cupsLangPrintf(stdout, "\t%s", state_message);
       else
 	cupsLangPuts(stdout, _("\treason unknown"));
     }
 
     if (long_status)
     {
-      cupsLangPrintf(stdout, _("\tDescription: %s"), printer_info ? printer_info : "");
-      cupsLangPrintf(stdout, _("\tMake and Model: %s"), printer_make_and_model ? printer_make_and_model : "");
+      cupsLangPrintf(stdout, _("\tDescription: %s"), info ? info : "");
+      cupsLangPrintf(stdout, _("\tMake and Model: %s"), make_and_model ? make_and_model : "");
 
-      if (printer_state_reasons)
+      if (cupsArrayGetCount(state_reasons) > 0)
       {
         size_t	count;			// Number of values
 	char	alerts[1024],		// Alerts string
 		*aptr;			// Pointer into alerts string
 
-	for (j = 0, count = ippGetCount(printer_state_reasons), aptr = alerts; j < count; j ++)
+	for (j = 0, count = cupsArrayGetCount(state_reasons), aptr = alerts; j < count; j ++)
 	{
 	  if (j)
-	    snprintf(aptr, sizeof(alerts) - (size_t)(aptr - alerts), " %s", ippGetString(printer_state_reasons, j, NULL));
+	    snprintf(aptr, sizeof(alerts) - (size_t)(aptr - alerts), " %s", (char *)cupsArrayGetElement(state_reasons, j));
 	  else
-	    cupsCopyString(alerts, ippGetString(printer_state_reasons, j, NULL), sizeof(alerts));
+	    cupsCopyString(alerts, (char *)cupsArrayGetElement(state_reasons, j), sizeof(alerts));
 
 	  aptr += strlen(aptr);
 	}
@@ -1406,11 +1137,10 @@ show_printers(const char   *command,	// I - Command name
 	cupsLangPrintf(stdout, _("\tAlerts: %s"), alerts);
       }
 
-      cupsLangPrintf(stdout, _("\tLocation: %s"), printer_location ? printer_location : "");
+      cupsLangPrintf(stdout, _("\tLocation: %s"), location ? location : "");
     }
 
-    ippDelete(response);
-    httpClose(http);
+    cupsArrayDelete(state_reasons);
   }
 
   return (ret);
@@ -1459,7 +1189,7 @@ strdate(char   *buf,			// I - Buffer
   // Generate the local date and time...
   localtime_r(&timeval, &date);
 
-  if (cupsLangGetEncoding() != CUPS_ENCODING_UTF8)
+  if (cupsLangGetEncoding() != CUPS_ENCODING_UTF_8)
   {
     // Format to the temporary buffer and convert to UTF-8...
     strftime(temp, sizeof(temp), "%c", &date);
@@ -1481,8 +1211,8 @@ strdate(char   *buf,			// I - Buffer
 
 static void
 update_dests(const char  *command,	// I  - Command name
-             size_t      &num_dests,	// IO - Number of destinations
-             cups_dest_t **dests);	// IO - Destinations
+             size_t      *num_dests,	// IO - Number of destinations
+             cups_dest_t **dests)	// IO - Destinations
 {
   if (!*num_dests)
   {
