@@ -165,7 +165,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPuts(stderr, _("%s: Expected description after '-D' option."), "lpadmin");
+		  cupsLangPrintf(stderr, _("%s: Expected description after '-D' option."), "lpadmin");
 		  return (usage(stderr));
 		}
 
@@ -176,7 +176,7 @@ main(int  argc,				// I - Number of command-line arguments
 	  case 'd' : // -d DEST    Set as default destination
 	      if (op)
 	      {
-	        cupsLangPuts(stderr, _("lpadmin: The '-%c' and '-%c' options are incompatible."), op, *opt);
+	        cupsLangPrintf(stderr, _("%s: The '-%c' and '-%c' options are incompatible."), "lpadmin", op, *opt);
 	        return (usage(stderr));
 	      }
 
@@ -193,7 +193,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPuts(stderr, _("%s: Expected printer name after '-%c' option."), "lpadmin", op);
+		  cupsLangPrintf(stderr, _("%s: Expected printer name after '-%c' option."), "lpadmin", op);
 		  return (usage(stderr));
 		}
 
@@ -234,6 +234,26 @@ main(int  argc,				// I - Number of command-line arguments
 	      }
 	      break;
 
+	  case 'L' : // -L PLACE   Set the printer-location attribute
+	      if (opt[1] != '\0')
+	      {
+		num_options = cupsAddOption("printer-location", opt + 1, num_options, &options);
+		opt += strlen(opt) - 1;
+	      }
+	      else
+	      {
+		i ++;
+
+		if (i >= argc)
+		{
+		  cupsLangPrintf(stderr, _("%s: Expected location after '-L' option."), "lpadmin");
+		  return (usage(stderr));
+		}
+
+		num_options = cupsAddOption("printer-location", argv[i], num_options, &options);
+	      }
+	      break;
+
 	  case 'm' : // -m DRIVER  Use the specified standard script/PPD file
 	      if (opt[1] != '\0')
 	      {
@@ -246,7 +266,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPuts(stderr, _("%s: Expected driver name after '-m' option."), "lpadmin");
+		  cupsLangPrintf(stderr, _("%s: Expected driver name after '-m' option."), "lpadmin");
 		  return (usage(stderr));
 		}
 
@@ -277,7 +297,7 @@ main(int  argc,				// I - Number of command-line arguments
 	  case 'p' : // -p DEST    Add/modify a printer
 	      if (op)
 	      {
-	        cupsLangPuts(stderr, _("lpadmin: The '-%c' and '-%c' options are incompatible."), op, *opt);
+	        cupsLangPrintf(stderr, _("%s: The '-%c' and '-%c' options are incompatible."), "lpadmin", op, *opt);
 	        return (usage(stderr));
 	      }
 
@@ -294,7 +314,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPuts(stderr, _("%s: Expected printer name after '-%c' option."), "lpadmin", op);
+		  cupsLangPrintf(stderr, _("%s: Expected printer name after '-%c' option."), "lpadmin", op);
 		  return (usage(stderr));
 		}
 
@@ -322,7 +342,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPuts(stderr, _("lpadmin: Expected name after '-R' option."));
+		  cupsLangPrintf(stderr, _("%s: Expected name after '-R' option."), "lpadmin");
 		  return (usage(stderr));
 		}
 
@@ -395,7 +415,7 @@ main(int  argc,				// I - Number of command-line arguments
 		i ++;
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Error - expected username after \"-U\" option."), argv[0]);
+		  cupsLangPrintf(stderr, _("%s: Expected username after '-U' option."), "lpdmin");
 		  return (usage(stderr));
 		}
 
@@ -447,7 +467,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPuts(stderr, _("%s: Expected device URI after '-v' option."), "lpadmin");
+		  cupsLangPrintf(stderr, _("%s: Expected device URI after '-v' option."), "lpadmin");
 		  return (usage(stderr));
 		}
 
@@ -458,7 +478,7 @@ main(int  argc,				// I - Number of command-line arguments
 	  case 'x' : // Delete a printer
 	      if (op)
 	      {
-	        cupsLangPuts(stderr, _("lpadmin: The '-%c' and '-%c' options are incompatible."), op, *opt);
+	        cupsLangPrintf(stderr, _("%s: The '-%c' and '-%c' options are incompatible."), "lpadmin", op, *opt);
 	        return (usage(stderr));
 	      }
 
@@ -475,7 +495,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPuts(stderr, _("%s: Expected printer name after '-%c' option."), "lpadmin", op);
+		  cupsLangPrintf(stderr, _("%s: Expected printer name after '-%c' option."), "lpadmin", op);
 		  return (usage(stderr));
 		}
 
@@ -494,26 +514,6 @@ main(int  argc,				// I - Number of command-line arguments
 
 	      i = argc;
 #endif // 0
-	      break;
-
-	  case 'L' : // -L PLACE   Set the printer-location attribute
-	      if (opt[1] != '\0')
-	      {
-		num_options = cupsAddOption("printer-location", opt + 1, num_options, &options);
-		opt += strlen(opt) - 1;
-	      }
-	      else
-	      {
-		i ++;
-
-		if (i >= argc)
-		{
-		  cupsLangPuts(stderr, _("%s: Expected location after '-L' option."), "lpadmin");
-		  return (usage(stderr));
-		}
-
-		num_options = cupsAddOption("printer-location", argv[i], num_options, &options);
-	      }
 	      break;
 
 	  default :
@@ -544,7 +544,7 @@ main(int  argc,				// I - Number of command-line arguments
     case 'p' : // Add/modify printer
         if ((http = connect_dest(printer, &dest, resource, sizeof(resource))) == NULL)
         {
-          if ((dest = create_printer(printer, device_uri, driver, num_options, options)) == NULL)
+          if ((dest = create_dest(printer, device_uri, driver, num_options, options)) == NULL)
             return (1);
 
           if ((http = connect_dest(printer, &dest, resource, sizeof(resource))) == NULL)
@@ -585,7 +585,7 @@ connect_dest(const char  *printer,	// O - Printer name
   if (!*dest)
   {
     // Try to find the destination...
-    if ((*dest = cupsGetNamedDest(CUPS_HTTP_DEFAULT, printer, instance)) == NULL)
+    if ((*dest = cupsGetNamedDest(CUPS_HTTP_DEFAULT, printer, /*instance*/NULL)) == NULL)
     {
       // Destination doesn't exist...
       if (cupsGetError() == IPP_STATUS_ERROR_BAD_REQUEST || cupsGetError() == IPP_STATUS_ERROR_VERSION_NOT_SUPPORTED)
@@ -593,7 +593,7 @@ connect_dest(const char  *printer,	// O - Printer name
       else if (cupsGetError() == IPP_STATUS_ERROR_NOT_FOUND)
 	cupsLangPrintf(stderr, _("%s: The printer or class does not exist."), "lpadmin");
       else
-	cupsLangPrintf(stderr, _("%s: %s"), command, cupsGetErrorString());
+	cupsLangPrintf(stderr, _("%s: %s"), "lpadmin", cupsGetErrorString());
     }
     else
     {
@@ -642,11 +642,11 @@ create_dest(const char    *printer,	// I - Printer name
 
 
   // Connect to the server...
-  system_host = cupsServer();
+  system_host = cupsGetServer();
 
   if ((http = httpConnect(system_host, ippGetPort(), /*addrlist*/NULL, AF_UNSPEC, cupsGetEncryption(), /*blocking*/true, 30000, /*cancel*/NULL)) == NULL)
   {
-    cupsLangPrintf(stderr, _("%s: Unable to connect to '%s': %s"), "lpadmin", cupsServer(), cupsGetErrorString());
+    cupsLangPrintf(stderr, _("%s: Unable to connect to '%s': %s"), "lpadmin", system_host, cupsGetErrorString());
     return (NULL);
   }
 
@@ -663,7 +663,7 @@ create_dest(const char    *printer,	// I - Printer name
   ippAddString(request, IPP_TAG_PRINTER, IPP_TAG_NAME, "printer-name", NULL, printer);
   ippAddString(request, IPP_TAG_PRINTER, IPP_TAG_KEYWORD, "smi55357-device-type", NULL, driver);
   ippAddString(request, IPP_TAG_PRINTER, IPP_TAG_URI, "smi55357-device-uri", NULL, device_uri);
-  cupsEncodeOptions(request, IPP_TAG_PRINTER, num_options, options);
+  cupsEncodeOptions(request, num_options, options, IPP_TAG_PRINTER);
 
   response = cupsDoRequest(http, request, "/ipp/system");
 
@@ -697,7 +697,7 @@ delete_printer(http_t      *http,	// I - HTTP connection
   ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, printer_uri);
   ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name", NULL, cupsGetUser());
 
-  ippDelete(cupsDoRequest(http, request, resource));
+  ippDelete(cupsDoRequest(http, request, "/ipp/system"));
 
   if (cupsGetError() == IPP_STATUS_ERROR_OPERATION_NOT_SUPPORTED)
   {
