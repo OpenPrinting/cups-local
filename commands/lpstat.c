@@ -536,6 +536,7 @@ static int				// O - 0 on success, 1 on fail
 show_classes(const char   *command,	// I - Command name
 	     cups_array_t *printers)	// I - Destinations to show
 {
+  // TODO: Implement class support once cups-sharing has it...
   (void)command;
   (void)printers;
   return (0);
@@ -1235,6 +1236,8 @@ usage(FILE       *out,			// I - Output file
 {
   cupsLangPrintf(out, _("Usage: %s [OPTIONS]"), command);
   cupsLangPuts(out, _("Options:"));
+  cupsLangPuts(out, _("--help                         Show this help"));
+  cupsLangPuts(out, _("--version                      Show the program version"));
   if (!strcmp(command, "lpq"))
   {
     cupsLangPuts(out, _("-a                             Show jobs on all destinations"));

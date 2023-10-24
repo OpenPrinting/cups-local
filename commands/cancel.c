@@ -353,6 +353,8 @@ usage(FILE       *out,			// I - Output file
 			"       %s [OPTIONS] [DESTINATION]\n"
 			"       %s [OPTIONS] [DESTINATION-JOBID]"), command, command, command);
   cupsLangPuts(out, _("Options:"));
+  cupsLangPuts(out, _("--help                         Show this help"));
+  cupsLangPuts(out, _("--version                      Show the program version"));
   cupsLangPuts(out, _("-a                             Cancel all jobs"));
   cupsLangPuts(out, _("-E                             Encrypt the connection to the server"));
   cupsLangPuts(out, _("-h SERVER[:PORT]               Connect to the named server and port"));

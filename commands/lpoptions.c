@@ -535,6 +535,8 @@ usage(void)
                           "       lpoptions [options] [-p destination] -o option[=value]\n"
                           "       lpoptions [options] -x destination"));
   cupsLangPuts(stdout, _("Options:"));
+  cupsLangPuts(out, _("--help                         Show this help"));
+  cupsLangPuts(out, _("--version                      Show the program version"));
   cupsLangPuts(stdout, _("-d destination          Set default destination"));
   cupsLangPuts(stdout, _("-E                      Encrypt the connection to the server"));
   cupsLangPuts(stdout, _("-h server[:port]        Connect to the named server and port"));

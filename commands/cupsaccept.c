@@ -247,6 +247,8 @@ usage(FILE       *out,			// I - Output file
 {
   cupsLangPrintf(out, _("Usage: %s [options] destination(s)"), command);
   cupsLangPuts(out, _("Options:"));
+  cupsLangPuts(out, _("--help                         Show this help"));
+  cupsLangPuts(out, _("--version                      Show the program version"));
   cupsLangPuts(out, _("-E                             Encrypt the connection to the server"));
   cupsLangPuts(out, _("-h SERVER[:PORT]               Connect to the named server and port"));
   cupsLangPuts(out, _("-r reason                      Specify a reason message that others can see"));

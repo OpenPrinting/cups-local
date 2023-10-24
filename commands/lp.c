@@ -132,7 +132,7 @@ main(int  argc,				// I - Number of command-line arguments
 	      cupsSetEncryption(HTTP_ENCRYPTION_REQUIRED);
 	      break;
 
-	  case 'H' : // -H SERVER  Destination host
+	  case 'h' : // -h SERVER  Destination host
 	      if (opt[1] != '\0')
 	      {
 		cupsSetServer(opt + 1);
@@ -144,7 +144,7 @@ main(int  argc,				// I - Number of command-line arguments
 
 		if (i >= argc)
 		{
-		  cupsLangPrintf(stderr, _("%s: Expected server after '-H' option."), command);
+		  cupsLangPrintf(stderr, _("%s: Expected server after '-h' option."), command);
 		  return (usage(stderr, command));
 		}
 
@@ -694,6 +694,8 @@ usage(FILE       *out,			// I - Output file
     cupsLangPuts(out, _("Usage: lpr [OPTIONS] [FILES]"));
 
   cupsLangPuts(out, _("Options:"));
+  cupsLangPuts(out, _("--help                         Show this help"));
+  cupsLangPuts(out, _("--version                      Show the program version"));
   if (!strcmp(command, "lp"))
   {
     cupsLangPuts(out, _("-c                             Make a copy of the print file(s)"));
