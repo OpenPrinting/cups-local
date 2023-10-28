@@ -15,7 +15,6 @@ TARGETS	=	\
 OBJS	=	\
 		main.o \
 		dbus.o \
-		ipp-device.o \
 		transform.o
 
 
@@ -75,7 +74,7 @@ uninstall:
 cups-locald:	$(OBJS)
 	echo Linking $@...
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
-	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
+	$(CODE_SIGN) -s "$(CODESIGN_IDENTITY)" $@
 
 
 #
