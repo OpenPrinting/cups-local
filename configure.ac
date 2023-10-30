@@ -85,6 +85,7 @@ AS_IF([$PKGCONFIG --exists cups3], [
     LIBS="$LIBS $($PKGCONFIG --libs cups3)"
 ], [
     AC_MSG_RESULT([no])
+    $PKGCONFIG --debug --exists cups3
     AC_MSG_ERROR([CUPS library v3.0 or later is required.])
 ])
 
@@ -97,6 +98,7 @@ AS_IF([$PKGCONFIG --exists pappl --atleast-version=2.0], [
     LIBS="$LIBS $($PKGCONFIG --libs pappl)"
 ], [
     AC_MSG_RESULT([no])
+    $PKGCONFIG --debug --exists pappl
     AC_MSG_ERROR([PAPPL v2.0 or later is required.])
 ])
 

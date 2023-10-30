@@ -3814,6 +3814,7 @@ else $as_nop
 
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
+    $PKGCONFIG --debug --exists cups3
     as_fn_error $? "CUPS library v3.0 or later is required." "$LINENO" 5
 
 fi
@@ -3833,6 +3834,7 @@ else $as_nop
 
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
 printf "%s\n" "no" >&6; }
+    $PKGCONFIG --debug --exists pappl
     as_fn_error $? "PAPPL v2.0 or later is required." "$LINENO" 5
 
 fi
