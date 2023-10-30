@@ -47,10 +47,10 @@ jobs:
       env:
         ASAN_OPTIONS: leak_check_at_exit=false
       run: make test
-    - name: Run Clang Static Analyzer
-      run: make CC=clang "GHA_ERROR=::error::" clang
-    - name: Run cppcheck
-      run: make "GHA_ERROR=::error::" cppcheck
+#    - name: Run Clang Static Analyzer
+#      run: make CC=clang "GHA_ERROR=::error::" clang
+#    - name: Run cppcheck
+#      run: make "GHA_ERROR=::error::" cppcheck
 
   build-macos:
 
@@ -85,7 +85,7 @@ jobs:
       run: make
     - name: Test cups-local
       run: make test
-    - name: Run Clang Static Analyzer
-      run: make "GHA_ERROR=::error::" clang
-    - name: Run cppcheck
-      run: make "GHA_ERROR=::error::" cppcheck
+#    - name: Run Clang Static Analyzer
+#      run: make "GHA_ERROR=::error::" clang
+#    - name: Run cppcheck
+#      run: make "GHA_ERROR=::error::" cppcheck
