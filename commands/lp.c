@@ -459,7 +459,7 @@ main(int  argc,				// I - Number of command-line arguments
         unlink(files[idx]);
     }
   }
-  else if (cupsCreateDestJob(http, dest, dinfo, &job_id, title ? title : "(stdin)", num_options, options) != HTTP_STATUS_CONTINUE)
+  else if (cupsCreateDestJob(http, dest, dinfo, &job_id, title ? title : "(stdin)", num_options, options) >= IPP_STATUS_ERROR_BAD_REQUEST)
   {
     cupsLangPrintf(stderr, _("%s: Unable to create job: %s"), command, cupsGetErrorString());
   }
@@ -546,7 +546,7 @@ print_files(const char    *command,	// I - Command name
   int		job_id;			// Job ID
 
 
-  if (cupsCreateDestJob(http, dest, dinfo, &job_id, title, num_options, options) != HTTP_STATUS_CONTINUE)
+  if (cupsCreateDestJob(http, dest, dinfo, &job_id, title, num_options, options) >= IPP_STATUS_ERROR_BAD_REQUEST)
   {
     cupsLangPrintf(stderr, _("%s: Unable to create job: %s"), command, cupsGetErrorString());
     return (0);
