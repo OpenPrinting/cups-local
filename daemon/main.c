@@ -180,7 +180,10 @@ main(int  argc,				// I - Number of command-line arguments
 
       // Make ~/.config as needed
       if (mkdir(LocalSpoolDir, 0700) && errno != EEXIST)
-	spoolname[0] = '\0';
+      {
+        cupsLangPrintf(stderr, _("cups-locald: Unable to create ~/.config directory: %s"), strerror(errno));
+        return (1);
+      }
 
       if (LocalSpoolDir[0])
 	snprintf(LocalSpoolDir, sizeof(LocalSpoolDir), "%s/.config/cups-locald.d", home);
