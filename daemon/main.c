@@ -28,9 +28,12 @@ main(int  argc,				// I - Number of command-line arguments
 {
   int		i;			// Looping var
   const char	*opt,			// Current option
+		*home = getenv("HOME"),	// Home directory
 		*log_file = "syslog",	// Log file
-		*spool_directory = NULL,// Spool directory
-		*state_file = NULL;	// State file
+		*snap_common = getenv("SNAP_COMMON"),
+					// Common data directory for snaps
+		*tmpdir = getenv("TMPDIR");
+					// Temporary directory
   pappl_loglevel_t log_level = PAPPL_LOGLEVEL_INFO;
 					// Log level
   pappl_system_t *system;		// System object
@@ -66,7 +69,7 @@ main(int  argc,				// I - Number of command-line arguments
 	        return (usage(stderr));
 	      }
 
-	      spool_directory = argv[i];
+	      cupsCopyString(LocalSpoolDir, argv[i], sizeof(LocalSpoolDir));
 	      break;
 
 	  case 'L' : // -L LOGLEVEL
@@ -130,7 +133,7 @@ main(int  argc,				// I - Number of command-line arguments
 	        return (usage(stderr));
 	      }
 
-	      state_file = argv[i];
+	      cupsCopyString(LocalStateFile, argv[i], sizeof(LocalStateFile));
 	      break;
 
 	  default : //
@@ -146,18 +149,64 @@ main(int  argc,				// I - Number of command-line arguments
     }
   }
 
-  // Create the system object...
-  system = papplSystemCreate(PAPPL_SOPTIONS_MULTI_QUEUE, "cups-locald", /*port*/0, /*subtypes*/NULL, spool_directory, log_file, log_level, /*auth_service*/NULL, /*tls_only*/false);
+  // Set defaults...
+#ifdef __APPLE__
+  if (!tmpdir)
+    tmpdir = "/private/tmp";
+#else
+  if (!tmpdir)
+    tmpdir = "/tmp";
+#endif // __APPLE__
 
-  // Setup domain socket listener
   if (!LocalSocket[0])
-  {
-    const char *tmpdir = getenv("TMPDIR");
-					// Temporary directory
-
     snprintf(LocalSocket, sizeof(LocalSocket), "%s/cups-locald%d.sock", tmpdir, (int)getuid());
+
+  if (!LocalSpoolDir[0])
+  {
+    if (snap_common)
+    {
+      // Running inside a snap (https://snapcraft.io), so use the snap's common
+      // data directory...
+      snprintf(LocalSpoolDir, sizeof(LocalSpoolDir), "%s/cups-locald.d", snap_common);
+    }
+    else if (home)
+    {
+#ifdef __APPLE__
+      // Put the spool directory in "~/Library/Application Support"
+      snprintf(LocalSpoolDir, sizeof(LocalSpoolDir), "%s/Library/Application Support/cups-locald.d", home);
+#else
+      // Put the spool directory under a ".config" directory in the home directory
+      snprintf(LocalSpoolDir, sizeof(LocalSpoolDir), "%s/.config", home);
+
+      // Make ~/.config as needed
+      if (mkdir(LocalSpoolDir, 0700) && errno != EEXIST)
+	spoolname[0] = '\0';
+
+      if (LocalSpoolDir[0])
+	snprintf(LocalSpoolDir, sizeof(LocalSpoolDir), "%s/.config/cups-locald.d", home);
+#endif // __APPLE__
+    }
+    else
+    {
+      // As a last resort, put the spool directory in the temporary directory
+      // (where it will be lost on the nest reboot/logout...
+      snprintf(LocalSpoolDir, sizeof(LocalSpoolDir), "%s/cups-locald%d.d", tmpdir, (int)getuid());
+    }
   }
 
+  // Create the system object...
+  system = papplSystemCreate(PAPPL_SOPTIONS_MULTI_QUEUE, "cups-locald", /*port*/0, /*subtypes*/NULL, LocalSpoolDir, log_file, log_level, /*auth_service*/NULL, /*tls_only*/false);
+  papplSystemSetIdleShutdown(system, 120);
+
+  // Load/save state to the state file...
+  if (!papplSystemLoadState(system, LocalStateFile))
+  {
+    // TODO: Set default values for things...
+  }
+
+  papplSystemSetSaveCallback(system, (pappl_save_cb_t)papplSystemSaveState, (void *)LocalStateFile);
+
+  // Setup domain socket listener
   papplSystemAddListeners(system, LocalSocket);
 
   // Setup the generic drivers...
@@ -166,7 +215,7 @@ main(int  argc,				// I - Number of command-line arguments
   // Run until we are no longer needed...
   papplSystemRun(system);
 
-  return (1);
+  return (0);
 }
 
 

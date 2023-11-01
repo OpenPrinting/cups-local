@@ -36,6 +36,10 @@ VAR pappl_pr_driver_t	LocalDrivers[3]
 ;
 VAR char		LocalSocket[256] VALUE("");
 					// Domain socket path
+VAR char		LocalSpoolDir[256] VALUE("");
+					// Spool directory
+VAR char		LocalStateFile[256] VALUE("");
+					// State file
 
 
 //
