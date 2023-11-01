@@ -15,6 +15,7 @@ TARGETS	=	\
 OBJS	=	\
 		main.o \
 		dbus.o \
+		drivers.o \
 		transform.o
 
 

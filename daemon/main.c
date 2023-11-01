@@ -7,6 +7,7 @@
 // information.
 //
 
+#define CUPS_LOCAL_MAIN_C
 #include "cups-locald.h"
 
 
@@ -51,7 +52,7 @@ main(int  argc,				// I - Number of command-line arguments
       puts(CUPS_LOCAL_VERSION);
       return (0);
     }
-    else if (argv[i][0] == '-' && argv[i][1] && argc[i][1] != '-')
+    else if (argv[i][0] == '-' && argv[i][1] && argv[i][1] != '-')
     {
       for (opt = argv[i] + 1; *opt; opt ++)
       {
@@ -88,9 +89,9 @@ main(int  argc,				// I - Number of command-line arguments
 	      {
 	        log_level = PAPPL_LOGLEVEL_INFO;
 	      }
-	      else if (!strcmp(argv[i], "warning"))
+	      else if (!strcmp(argv[i], "warn"))
 	      {
-	        log_level = PAPPL_LOGLEVEL_WARNING;
+	        log_level = PAPPL_LOGLEVEL_WARN;
 	      }
 	      else
 	      {
@@ -108,6 +109,17 @@ main(int  argc,				// I - Number of command-line arguments
 	      }
 
 	      log_file = argv[i];
+	      break;
+
+	  case 'S' : // -S SOCKETFILE
+	      i ++;
+	      if (i >= argc)
+	      {
+	        cupsLangPrintf(stderr, _("%s: Missing socket file after '-S'."), "cups-locald");
+	        return (usage(stderr));
+	      }
+
+	      cupsCopyString(LocalSocket, argv[i], sizeof(LocalSocket));
 	      break;
 
 	  case 's' : // -s STATEFILE
@@ -137,6 +149,20 @@ main(int  argc,				// I - Number of command-line arguments
   // Create the system object...
   system = papplSystemCreate(PAPPL_SOPTIONS_MULTI_QUEUE, "cups-locald", /*port*/0, /*subtypes*/NULL, spool_directory, log_file, log_level, /*auth_service*/NULL, /*tls_only*/false);
 
+  // Setup domain socket listener
+  if (!LocalSocket[0])
+  {
+    const char *tmpdir = getenv("TMPDIR");
+					// Temporary directory
+
+    snprintf(LocalSocket, sizeof(LocalSocket), "%s/cups-locald%d.sock", tmpdir, (int)getuid());
+  }
+
+  papplSystemAddListeners(system, LocalSocket);
+
+  // Setup the generic drivers...
+  papplSystemSetPrinterDrivers(system, sizeof(LocalDrivers) / sizeof(LocalDrivers[0]), LocalDrivers, LocalDriverAutoAdd, /* create_cb */NULL, LocalDriverCallback, NULL);
+
   // Run until we are no longer needed...
   papplSystemRun(system);
 
@@ -157,8 +183,9 @@ usage(FILE *out)			// I - Output file
   cupsLangPuts(out, _("--help                         Show this help"));
   cupsLangPuts(out, _("--version                      Show the program version"));
   cupsLangPuts(out, _("-d SPOOLDIR                    Set the spool directory"));
-  cupsLangPuts(out, _("-L LOGLEVEL                    Set the log level (error,warning,info,debug)"));
+  cupsLangPuts(out, _("-L LOGLEVEL                    Set the log level (error,warn,info,debug)"));
   cupsLangPuts(out, _("-l LOGFILE                     Set the log file"));
+  cupsLangPuts(out, _("-S SOCKETFILE                  Set the domain socket file"));
   cupsLangPuts(out, _("-s STATEFILE                   Set the state/configuration file"));
 
   return (out == stdout ? 0 : 1);
