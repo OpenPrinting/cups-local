@@ -82,7 +82,7 @@ AC_MSG_CHECKING([for CUPS library v3])
 AS_IF([$PKGCONFIG --exists cups3], [
     AC_MSG_RESULT([yes])
     CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags cups3)"
-    LIBS="$LIBS $($PKGCONFIG --libs cups3)"
+    LIBS="$($PKGCONFIG --libs cups3) $LIBS"
 ], [
     AC_MSG_RESULT([no])
     $PKGCONFIG --debug --exists cups3
@@ -95,7 +95,7 @@ AC_MSG_CHECKING([for PAPPL library v2.0 or later])
 AS_IF([$PKGCONFIG --exists pappl --atleast-version=2.0], [
     AC_MSG_RESULT([yes])
     CPPFLAGS="$CFLAGS $($PKGCONFIG --cflags pappl)"
-    LIBS="$LIBS $($PKGCONFIG --libs pappl)"
+    LIBS="$($PKGCONFIG --libs pappl) $LIBS"
 ], [
     AC_MSG_RESULT([no])
     $PKGCONFIG --debug --exists pappl
@@ -117,7 +117,7 @@ AS_IF([test "x$enable_dbus" != xno], [
 	AC_MSG_RESULT([yes])
 	AC_DEFINE([HAVE_DBUS], [1], [Have dbus library?])
 	CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags dbus-1) -DDBUS_API_SUBJECT_TO_CHANGE"
-	LIBS="$LIBS $($PKGCONFIG --libs dbus-1)"
+	LIBS="$($PKGCONFIG --libs dbus-1) $LIBS"
 	AC_CHECK_FUNC([dbus_message_iter_init_append], [
 	    AC_DEFINE([HAVE_DBUS_MESSAGE_ITER_INIT_APPEND], [1], [Have dbus_message_iter_init_append function?])
 	])

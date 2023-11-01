@@ -3808,7 +3808,7 @@ then :
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
     CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags cups3)"
-    LIBS="$LIBS $($PKGCONFIG --libs cups3)"
+    LIBS="$($PKGCONFIG --libs cups3) $LIBS"
 
 else $as_nop
 
@@ -3828,7 +3828,7 @@ then :
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
     CPPFLAGS="$CFLAGS $($PKGCONFIG --cflags pappl)"
-    LIBS="$LIBS $($PKGCONFIG --libs pappl)"
+    LIBS="$($PKGCONFIG --libs pappl) $LIBS"
 
 else $as_nop
 
@@ -3873,7 +3873,7 @@ printf "%s\n" "yes" >&6; }
 printf "%s\n" "#define HAVE_DBUS 1" >>confdefs.h
 
 	CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags dbus-1) -DDBUS_API_SUBJECT_TO_CHANGE"
-	LIBS="$LIBS $($PKGCONFIG --libs dbus-1)"
+	LIBS="$($PKGCONFIG --libs dbus-1) $LIBS"
 	ac_fn_c_check_func "$LINENO" "dbus_message_iter_init_append" "ac_cv_func_dbus_message_iter_init_append"
 if test "x$ac_cv_func_dbus_message_iter_init_append" = xyes
 then :
