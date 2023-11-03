@@ -25,12 +25,16 @@
 #    define VALUE(x)
 #  endif // CUPS_LOCAL_MAIN_C
 
-VAR pappl_pr_driver_t	LocalDrivers[3]
+VAR pappl_pr_driver_t	LocalDrivers[7]
 #  ifdef CUPS_LOCAL_MAIN_C
 = {
-  { "everywhere", "IPP Everywhere™",    NULL, NULL },
-  { "pcl",        "Generic PCL",        NULL, NULL },
-  { "ps",         "Generic PostScript", NULL, NULL }
+  { "everywhere",      "IPP Everywhere™",                     NULL, NULL },
+  { "pcl",             "Generic PCL",                         NULL, NULL },
+  { "pcl_duplex",      "Generic PCL w/Duplexer",              NULL, NULL },
+  { "ps",              "Generic PostScript",                  NULL, NULL },
+  { "ps_color",        "Generic Color PostScript",            NULL, NULL },
+  { "ps_duplex",       "Generic PostScript w/Duplexer",       NULL, NULL },
+  { "ps_color_duplex", "Generic Color PostScript w/Duplexer", NULL, NULL }
 }
 #  endif // CUPS_LOCAL_MAIN_C
 ;

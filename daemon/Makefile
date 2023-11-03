@@ -79,6 +79,16 @@ cups-locald:	$(OBJS)
 
 
 #
+# iconsh - all of the PNG icons as a header file...
+#
+
+.PHONY:	iconsh
+iconsh:
+	echo Generating icons.h...
+	pappl-makeresheader *.png >icons.h
+
+
+#
 # Dependencies...
 #
 
