@@ -186,6 +186,17 @@ LocalDriverCallback(
   if (!strcmp(driver_name, "everywhere"))
   {
     // Query the printer for capabilities...
+
+    // TODO: Query IPP printer for capabilities
+    /* Default icons */
+    data->icons[0].data    = everywhere_sm_png;
+    data->icons[0].datalen = sizeof(everywhere_sm_png);
+
+    data->icons[1].data    = everywhere_md_png;
+    data->icons[1].datalen = sizeof(everywhere_md_png);
+
+    data->icons[2].data    = everywhere_lg_png;
+    data->icons[2].datalen = sizeof(everywhere_lg_png);
   }
   else
   {
