@@ -3,7 +3,7 @@ CUPS Local Services (cups-local)
 
 ![Version](https://img.shields.io/github/v/release/OpenPrinting/cups-local?include_prereleases)
 ![Apache 2.0](https://img.shields.io/github/license/OpenPrinting/cups-local)
-[![Build and Test](https://github.com/OpenPrinting/cups-local/workflows/Build%20and%20Test/badge.svg)](https://github.com/OpenPrinting/cups-local/actions/workflows/build.yml)
+[![Build](https://github.com/OpenPrinting/cups-local/workflows/Build/badge.svg)](https://github.com/OpenPrinting/cups-local/actions/workflows/build.yml)
 [![Coverity Scan](https://img.shields.io/coverity/scan/NNNNN)](https://scan.coverity.com/projects/OpenPrinting-cups-local)
 
 > *Note:* This project is intended to be paired with the "libcups", and
