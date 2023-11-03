@@ -9,6 +9,7 @@
 
 #define CUPS_LOCAL_MAIN_C
 #include "cups-locald.h"
+#include <cups/thread.h>
 
 
 //
@@ -37,6 +38,9 @@ main(int  argc,				// I - Number of command-line arguments
   pappl_loglevel_t log_level = PAPPL_LOGLEVEL_INFO;
 					// Log level
   pappl_system_t *system;		// System object
+#ifdef HAVE_DBUS
+  cups_thread_t	dbus;			// D-Bus thread
+#endif // HAVE_DBUS
 
 
   // Setup localization...
@@ -215,8 +219,19 @@ main(int  argc,				// I - Number of command-line arguments
   // Setup the generic drivers...
   papplSystemSetPrinterDrivers(system, sizeof(LocalDrivers) / sizeof(LocalDrivers[0]), LocalDrivers, LocalDriverAutoAdd, /* create_cb */NULL, LocalDriverCallback, NULL);
 
+#ifdef HAVE_DBUS
+  // Start a background thread for D-Bus...
+  dbus = cupsThreadCreate(LocalDBusService, /*arg*/NULL);
+#endif // HAVE_DBUS
+
   // Run until we are no longer needed...
   papplSystemRun(system);
+
+#ifdef HAVE_DBUS
+  // Stop background thread for D-Bus...
+  cupsThreadCancel(dbus);
+  cupsThreadWait(dbus);
+#endif // HAVE_DBUS
 
   return (0);
 }

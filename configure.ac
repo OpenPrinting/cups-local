@@ -272,5 +272,7 @@ AC_SUBST([CUPS_LOCAL_DATADIR])
 dnl Generate a bunch of files...
 AC_CONFIG_FILES([
     Makedefs
+    daemon/cups-locald.service
+    daemon/cups-locald-dbus.service
 ])
 AC_OUTPUT

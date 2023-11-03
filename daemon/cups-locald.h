@@ -50,6 +50,10 @@ VAR char		LocalStateFile[256] VALUE("");
 // Functions...
 //
 
+#  ifdef HAVE_DBUS
+extern void		*LocalDBusService(void *data);
+#  endif // HAVE_DBUS
+
 extern const char	*LocalDriverAutoAdd(const char *device_info, const char *device_uri, const char *device_id, void *data);
 extern bool		LocalDriverCallback(pappl_system_t *system, const char *driver_name, const char *device_uri, const char *device_id, pappl_pr_driver_data_t *driver_data, ipp_t **driver_attrs, void *data);
 

@@ -4185,7 +4185,7 @@ printf "%s\n" "#define CUPS_LOCAL_DATADIR \"$datadir/cups-local\"" >>confdefs.h
 
 
 
-ac_config_files="$ac_config_files Makedefs"
+ac_config_files="$ac_config_files Makedefs daemon/cups-locald.service daemon/cups-locald-dbus.service"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -4874,6 +4874,8 @@ do
   case $ac_config_target in
     "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
     "Makedefs") CONFIG_FILES="$CONFIG_FILES Makedefs" ;;
+    "daemon/cups-locald.service") CONFIG_FILES="$CONFIG_FILES daemon/cups-locald.service" ;;
+    "daemon/cups-locald-dbus.service") CONFIG_FILES="$CONFIG_FILES daemon/cups-locald-dbus.service" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac

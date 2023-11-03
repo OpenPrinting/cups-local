@@ -1,3 +1,4 @@
+*.o
 /autom4te*.cache
 /commands/cancel
 /commands/cupsaccept
@@ -18,4 +19,6 @@
 /config.status
 /configure~
 /daemon/cups-locald
+/daemon/cups-locald.service
+/daemon/cups-locald-dbus.service
 /Makedefs

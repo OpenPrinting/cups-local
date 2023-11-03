@@ -1,0 +1,7 @@
+[Unit]
+Description=CUPS Local Spooler
+
+[Service]
+Type=dbus
+BusName=org.openprinting.cups-locald
+ExecStart=@sbindir@/cups-locald
