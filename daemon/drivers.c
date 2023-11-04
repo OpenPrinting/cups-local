@@ -148,7 +148,7 @@ LocalDriverAutoAdd(
 
 bool
 LocalDriverCallback(
-    pappl_system_t         *system,	// I - System (unused)
+    pappl_system_t         *system,	// I - System
     const char             *driver_name,// I - Driver name
     const char             *device_uri,	// I - Device URI
     const char             *device_id,	// I - IEEE-1284 device ID (unused)
@@ -178,17 +178,425 @@ LocalDriverCallback(
   };
 
 
-  (void)system;
   (void)device_id;
   (void)attrs;
   (void)cbdata;
 
+  // Dither arrays...
+  for (i = 0; i < 16; i ++)
+  {
+    // Apply gamma correction to dither array...
+    for (j = 0; j < 16; j ++)
+      data->gdither[i][j] = 255 - (int)(255.0 * pow(1.0 - dither[i][j] / 255.0, 0.4545));
+  }
+
+  memcpy(data->pdither, data->gdither, sizeof(data->pdither));
+
+  // orientation-requested-default and quality-default
+  data->orient_default  = IPP_ORIENT_NONE;
+  data->quality_default = IPP_QUALITY_NORMAL;
+
+  // Printer-specific capabilities...
   if (!strcmp(driver_name, "everywhere"))
   {
     // Query the printer for capabilities...
+    http_t		*http;		// HTTP connection
+    char		scheme[32],	// URI scheme
+			userpass[256],	// URI username:password (not used)
+			host[256],	// URI hostname
+			resource[256];	// URI resource path
+    int			port;		// URI port
+    http_encryption_t	encryption;	// Encryption to use
+    ipp_t		*request,	// IPP request
+			*response;	// IPP response
+    ipp_attribute_t	*attr;		// Supported/default attribute
+    size_t		count;		// Number of values
+    pwg_media_t		*pwg;		// Media info
+    const char		*keyword;	// Source/type
 
-    // TODO: Query IPP printer for capabilities
-    /* Default icons */
+    // Connect to the printer and get its capabilities...
+    httpSeparateURI(HTTP_URI_CODING_ALL, device_uri, scheme, sizeof(scheme), userpass, sizeof(userpass), host, sizeof(host), &port, resource, sizeof(resource));
+    if (port == 443 || !strcmp(scheme, "ipps"))
+      encryption = HTTP_ENCRYPTION_ALWAYS;
+    else
+      encryption = HTTP_ENCRYPTION_IF_REQUESTED;
+
+    if ((http = httpConnect(host, port, /*addrlist*/NULL, AF_UNSPEC, encryption, /*blocking*/true, 30000, /*cancel*/NULL)) == NULL)
+    {
+      papplLog(system, PAPPL_LOGLEVEL_ERROR, "Unable to connect to IPP printer '%s': %s", device_uri, cupsGetErrorString());
+      return (false);
+    }
+
+    request = ippNewRequest(IPP_OP_GET_PRINTER_ATTRIBUTES);
+    ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_URI, "printer-uri", NULL, device_uri);
+
+    response = cupsDoRequest(http, request, resource);
+
+    // Copy over capabilities...
+    // Make and model name
+    if ((attr = ippFindAttribute(response, "printer-make-and-model", IPP_TAG_TEXT)) != NULL)
+      cupsCopyString(data->make_and_model, ippGetString(attr, 0, NULL), sizeof(data->make_and_model));
+    else
+      cupsCopyString(data->make_and_model, "Generic IPP Printer", sizeof(data->make_and_model));
+
+    // Native format
+    attr = ippFindAttribute(response, "document-format-supported", IPP_TAG_MIMETYPE);
+    if (ippContainsString(attr, "application/pdf"))
+      data->format = "application/pdf";
+    else if (ippContainsString(attr, "application/postscript"))
+      data->format = "application/postscript";
+    else if (ippContainsString(attr, "application/vnd.hp-pcl"))
+      data->format = "application/vnd.hp-pcl";
+
+    // pages-per-minute[-color]
+    data->ppm       = ippGetInteger(ippFindAttribute(response, "pages-per-minute", IPP_TAG_INTEGER), 0);
+    data->ppm_color = ippGetInteger(ippFindAttribute(response, "pages-per-minute-color", IPP_TAG_INTEGER), 0);
+
+    // Resolutions
+    if ((attr = ippFindAttribute(response, "pwg-raster-document-resolution-supported", IPP_TAG_RESOLUTION)) != NULL)
+    {
+      ipp_res_t units;			// Units
+
+      if ((count = ippGetCount(attr)) > PAPPL_MAX_RESOLUTION)
+      {
+        i                    = count - PAPPL_MAX_RESOLUTION + 1;
+        data->num_resolution = PAPPL_MAX_RESOLUTION;
+      }
+      else
+      {
+        i                    = 0;
+        data->num_resolution = count;
+      }
+
+      for (j = 0; i < count; i ++, j ++)
+        data->x_resolution[j] = ippGetResolution(attr, i, data->y_resolution + j, &units);
+    }
+    else if ((attr = ippFindAttribute(response, "urf-supported", IPP_TAG_KEYWORD)) != NULL)
+    {
+      const char	*rs,		// Raster resolution value
+			*rsptr;		// Pointer into value
+
+      for (i = 0, count = ippGetCount(attr); i < count; i ++)
+      {
+        // Look for a resolution (RS) keyword...
+        rs = ippGetString(attr, i, NULL);
+        if (strncmp(rs, "RS", 2))
+          continue;
+
+        // Parse "RS###[-...-###]" string...
+        for (rsptr = rs + 2, j = 0; j < PAPPL_MAX_RESOLUTION && rsptr && *rsptr; j ++)
+        {
+          if (*rsptr == '-')
+            rsptr ++;
+
+          data->x_resolution[j] = data->y_resolution[j] = (int)strtol(rsptr, (char **)&rsptr, 10);
+          data->num_resolution ++;
+        }
+        break;
+      }
+    }
+    else if ((attr = ippFindAttribute(response, "printer-resolution-supported", IPP_TAG_RESOLUTION)) != NULL)
+    {
+      ipp_res_t units;			// Units
+
+      if ((count = ippGetCount(attr)) > PAPPL_MAX_RESOLUTION)
+      {
+        i                    = count - PAPPL_MAX_RESOLUTION + 1;
+        data->num_resolution = PAPPL_MAX_RESOLUTION;
+      }
+      else
+      {
+        i                    = 0;
+        data->num_resolution = count;
+      }
+
+      for (j = 0; i < count; i ++, j ++)
+        data->x_resolution[j] = ippGetResolution(attr, i, data->y_resolution + j, &units);
+    }
+    else
+    {
+      // Default resolution of 300dpi
+      data->num_resolution  = 1;
+      data->x_resolution[0] = 300;
+      data->y_resolution[0] = 300;
+    }
+
+    data->x_default = data->x_resolution[(data->num_resolution + 1) / 2];
+    data->y_default = data->y_resolution[(data->num_resolution + 1) / 2];
+
+    // Media
+    if ((attr = ippFindAttribute(response, "media-supported", IPP_TAG_KEYWORD)) == NULL)
+      attr = ippFindAttribute(response, "media-supported", IPP_TAG_NAME);
+
+    if (attr)
+    {
+      // Use printer media list
+      if ((count = ippGetCount(attr)) > PAPPL_MAX_MEDIA)
+        count = PAPPL_MAX_MEDIA;
+
+      data->num_media = count;
+      // TODO: Add cups-locald string pool
+      for (i = 0; i < count; i ++)
+        data->media[i] = strdup(ippGetString(attr, i, NULL));
+    }
+    else
+    {
+      // Use default media list
+      data->num_media = sizeof(pclps_media) / sizeof(pclps_media[0]);
+      memcpy(data->media, pclps_media, sizeof(pclps_media));
+    }
+
+    if ((attr = ippFindAttribute(response, "media-left-margin-supported", IPP_TAG_INTEGER)) != NULL)
+      data->left_right = ippGetInteger(attr, ippGetCount(attr) - 1);
+    else
+      data->left_right = 423;		// Default 1/6" left/right margins
+
+    data->borderless = ippContainsInteger(attr, 0);
+
+    if ((attr = ippFindAttribute(response, "media-top-margin-supported", IPP_TAG_INTEGER)) != NULL)
+      data->bottom_top = ippGetInteger(attr, ippGetCount(attr) - 1);
+    else
+      data->bottom_top = 423;		// Default 1/6" top/bottom margins
+
+    data->borderless &= ippContainsInteger(attr, 0);
+
+    if ((attr = ippFindAttribute(response, "media-source-supported", IPP_TAG_KEYWORD)) == NULL)
+      attr = ippFindAttribute(response, "media-source-supported", IPP_TAG_NAME);
+
+    if (attr)
+    {
+      // Use printer media source list
+      if ((count = ippGetCount(attr)) > PAPPL_MAX_SOURCE)
+        count = PAPPL_MAX_SOURCE;
+
+      data->num_source = count;
+      // TODO: Add cups-locald string pool
+      for (i = 0; i < count; i ++)
+        data->source[i] = strdup(ippGetString(attr, i, NULL));
+    }
+    else
+    {
+      // Use default media source list
+      data->num_source = 1;
+      data->source[0]  = "auto";
+    }
+
+    if ((attr = ippFindAttribute(response, "media-type-supported", IPP_TAG_KEYWORD)) == NULL)
+      attr = ippFindAttribute(response, "media-type-supported", IPP_TAG_NAME);
+
+    if (attr)
+    {
+      // Use printer media type list
+      if ((count = ippGetCount(attr)) > PAPPL_MAX_TYPE)
+        count = PAPPL_MAX_TYPE;
+
+      data->num_type = count;
+      // TODO: Add cups-locald string pool
+      for (i = 0; i < count; i ++)
+        data->type[i] = strdup(ippGetString(attr, i, NULL));
+    }
+    else
+    {
+      // Use default media type list
+      data->num_type = 1;
+      data->type[0]  = "auto";
+    }
+
+    if ((attr = ippFindAttribute(response, "media-col-default", IPP_TAG_BEGIN_COLLECTION)) != NULL)
+    {
+      ipp_t		*col;		// Collection value
+
+      col = ippGetCollection(attr, 0);
+
+      data->media_default.size_width    = ippGetInteger(ippFindAttribute(col, "media-size/x-dimension", IPP_TAG_INTEGER), 0);
+      data->media_default.size_length   = ippGetInteger(ippFindAttribute(col, "media-size/x-dimension", IPP_TAG_INTEGER), 0);
+      data->media_default.bottom_margin = ippGetInteger(ippFindAttribute(col, "media-bottom-margin", IPP_TAG_INTEGER), 0);
+      data->media_default.left_margin   = ippGetInteger(ippFindAttribute(col, "media-left-margin", IPP_TAG_INTEGER), 0);
+      data->media_default.right_margin  = ippGetInteger(ippFindAttribute(col, "media-right-margin", IPP_TAG_INTEGER), 0);
+      data->media_default.top_margin    = ippGetInteger(ippFindAttribute(col, "media-top-margin", IPP_TAG_INTEGER), 0);
+
+      if ((pwg = pwgMediaForSize(data->media_default.size_width, data->media_default.size_length)) != NULL)
+        cupsCopyString(data->media_default.size_name, pwg->pwg, sizeof(data->media_default.size_name));
+      else
+        pwgFormatSizeName(data->media_default.size_name, sizeof(data->media_default.size_name), "custom", /*name*/NULL, data->media_default.size_width, data->media_default.size_length, /*units*/NULL);
+
+      if ((keyword = ippGetString(ippFindAttribute(col, "media-source", IPP_TAG_KEYWORD), 0, NULL)) != NULL)
+        cupsCopyString(data->media_default.source, keyword, sizeof(data->media_default.source));
+
+      if ((keyword = ippGetString(ippFindAttribute(col, "media-type", IPP_TAG_KEYWORD), 0, NULL)) != NULL)
+        cupsCopyString(data->media_default.type, keyword, sizeof(data->media_default.type));
+    }
+    else
+    {
+      if ((attr = ippFindAttribute(response, "media-default", IPP_TAG_KEYWORD)) == NULL)
+        attr = ippFindAttribute(response, "media-default", IPP_TAG_NAME);
+
+      if ((keyword = ippGetString(attr, 0, NULL)) == NULL)
+        keyword = "iso_a4_210x297mm";
+
+      cupsCopyString(data->media_default.size_name, keyword, sizeof(data->media_default.size_name));
+
+      if ((pwg = pwgMediaForPWG(keyword)) != NULL)
+      {
+        data->media_default.size_width  = pwg->width;
+        data->media_default.size_length = pwg->length;
+      }
+      else
+      {
+        // Default to ISO A4 dimensions
+        data->media_default.size_width  = 21000;
+        data->media_default.size_length = 29700;
+      }
+
+      data->media_default.bottom_margin = data->bottom_top;
+      data->media_default.left_margin   = data->left_right;
+      data->media_default.right_margin  = data->left_right;
+      data->media_default.top_margin    = data->bottom_top;
+
+      cupsCopyString(data->media_default.source, data->source[0], sizeof(data->media_default.source));
+      cupsCopyString(data->media_default.type, data->type[0], sizeof(data->media_default.type));
+    }
+
+    // Duplex
+    if ((attr = ippFindAttribute(response, "sides-supported", IPP_TAG_KEYWORD)) != NULL && ippGetCount(attr) > 1)
+    {
+      // 1- or 2-sided printing
+      data->sides_supported = PAPPL_SIDES_ONE_SIDED | PAPPL_SIDES_TWO_SIDED_LONG_EDGE | PAPPL_SIDES_TWO_SIDED_SHORT_EDGE;
+      data->sides_default   = PAPPL_SIDES_TWO_SIDED_LONG_EDGE;
+    }
+    else
+    {
+      // 1-sided printing only
+      data->sides_supported = PAPPL_SIDES_ONE_SIDED;
+      data->sides_default   = PAPPL_SIDES_ONE_SIDED;
+    }
+
+    // Finishings
+    if ((attr = ippFindAttribute(response, "finishings-supported", IPP_TAG_ENUM)) != NULL)
+    {
+      if (ippContainsInteger(attr, IPP_FINISHINGS_PUNCH))
+        data->finishings |= PAPPL_FINISHINGS_PUNCH;
+      if (ippContainsInteger(attr, IPP_FINISHINGS_STAPLE))
+        data->finishings |= PAPPL_FINISHINGS_STAPLE;
+      if (ippContainsInteger(attr, IPP_FINISHINGS_TRIM))
+        data->finishings |= PAPPL_FINISHINGS_TRIM;
+    }
+
+    // Color modes
+    if ((attr = ippFindAttribute(response, "print-color-mode-supported", IPP_TAG_KEYWORD)) != NULL)
+    {
+      data->color_supported = 0;
+      if (ippContainsString(attr, "auto"))
+        data->color_supported |= PAPPL_COLOR_MODE_AUTO;
+      if (ippContainsString(attr, "auto-monochrome"))
+        data->color_supported |= PAPPL_COLOR_MODE_AUTO_MONOCHROME;
+      if (ippContainsString(attr, "bi-level"))
+        data->color_supported |= PAPPL_COLOR_MODE_BI_LEVEL;
+      if (ippContainsString(attr, "color"))
+        data->color_supported |= PAPPL_COLOR_MODE_COLOR;
+      if (ippContainsString(attr, "monochrome"))
+        data->color_supported |= PAPPL_COLOR_MODE_MONOCHROME;
+      if (ippContainsString(attr, "process-monochrome"))
+        data->color_supported |= PAPPL_COLOR_MODE_PROCESS_MONOCHROME;
+    }
+    else if (ippGetBoolean(ippFindAttribute(response, "color-supported", IPP_TAG_BOOLEAN), 0))
+    {
+      data->color_supported = PAPPL_COLOR_MODE_AUTO | PAPPL_COLOR_MODE_COLOR | PAPPL_COLOR_MODE_MONOCHROME;
+    }
+    else
+    {
+      data->color_supported = PAPPL_COLOR_MODE_MONOCHROME;
+    }
+
+    if (data->color_supported & PAPPL_COLOR_MODE_COLOR)
+      data->color_default = PAPPL_COLOR_MODE_AUTO;
+    else
+      data->color_default = PAPPL_COLOR_MODE_MONOCHROME;
+
+    if ((attr = ippFindAttribute(response, "pwg-raster-document-type-supported", IPP_TAG_KEYWORD)) != NULL)
+    {
+      data->raster_types = 0;
+      if (ippContainsString(attr, "adobe-rgb_8"))
+        data->raster_types |= PAPPL_RASTER_TYPE_ADOBE_RGB_8;
+      if (ippContainsString(attr, "adobe-rgb_16"))
+        data->raster_types |= PAPPL_RASTER_TYPE_ADOBE_RGB_16;
+      if (ippContainsString(attr, "black_1"))
+        data->raster_types |= PAPPL_RASTER_TYPE_BLACK_1;
+      if (ippContainsString(attr, "black_8"))
+        data->raster_types |= PAPPL_RASTER_TYPE_BLACK_8;
+      if (ippContainsString(attr, "black_16"))
+        data->raster_types |= PAPPL_RASTER_TYPE_BLACK_16;
+      if (ippContainsString(attr, "cmyk_8"))
+        data->raster_types |= PAPPL_RASTER_TYPE_CMYK_8;
+      if (ippContainsString(attr, "cmyk_16"))
+        data->raster_types |= PAPPL_RASTER_TYPE_CMYK_16;
+      if (ippContainsString(attr, "rgb_8"))
+        data->raster_types |= PAPPL_RASTER_TYPE_RGB_8;
+      if (ippContainsString(attr, "rgb_16"))
+        data->raster_types |= PAPPL_RASTER_TYPE_RGB_16;
+      if (ippContainsString(attr, "sgray_8"))
+        data->raster_types |= PAPPL_RASTER_TYPE_SGRAY_8;
+      if (ippContainsString(attr, "sgray_16"))
+        data->raster_types |= PAPPL_RASTER_TYPE_SGRAY_16;
+      if (ippContainsString(attr, "srgb_8"))
+        data->raster_types |= PAPPL_RASTER_TYPE_SRGB_8;
+      if (ippContainsString(attr, "srgb_16"))
+        data->raster_types |= PAPPL_RASTER_TYPE_SRGB_16;
+    }
+    else if ((attr = ippFindAttribute(response, "urf-supported", IPP_TAG_KEYWORD)) != NULL)
+    {
+      data->raster_types = 0;
+      if (ippContainsString(attr, "W8"))
+        data->raster_types |= PAPPL_RASTER_TYPE_SGRAY_8;
+      if (ippContainsString(attr, "SRGB24"))
+        data->raster_types |= PAPPL_RASTER_TYPE_SRGB_8;
+      if (ippContainsString(attr, "ADOBERGB24"))
+        data->raster_types |= PAPPL_RASTER_TYPE_ADOBE_RGB_8;
+      if (ippContainsString(attr, "ADOBERGB48"))
+        data->raster_types |= PAPPL_RASTER_TYPE_ADOBE_RGB_16;
+    }
+    else if (ippGetBoolean(ippFindAttribute(response, "color-supported", IPP_TAG_BOOLEAN), 0))
+    {
+      data->raster_types = PAPPL_RASTER_TYPE_SGRAY_8 | PAPPL_RASTER_TYPE_SRGB_8;
+    }
+    else
+    {
+      data->raster_types = PAPPL_RASTER_TYPE_SGRAY_8;
+    }
+
+    // Kind
+    if ((attr = ippFindAttribute(response, "printer-kind", IPP_TAG_KEYWORD)) != NULL)
+    {
+      data->kind = 0;
+      if (ippContainsString(attr, "disc"))
+        data->kind |= PAPPL_KIND_DISC;
+      if (ippContainsString(attr, "document"))
+        data->kind |= PAPPL_KIND_DOCUMENT;
+      if (ippContainsString(attr, "envelope"))
+        data->kind |= PAPPL_KIND_ENVELOPE;
+      if (ippContainsString(attr, "label"))
+        data->kind |= PAPPL_KIND_LABEL;
+      if (ippContainsString(attr, "large-format"))
+        data->kind |= PAPPL_KIND_LARGE_FORMAT;
+      if (ippContainsString(attr, "photo"))
+        data->kind |= PAPPL_KIND_PHOTO;
+      if (ippContainsString(attr, "postcard"))
+        data->kind |= PAPPL_KIND_POSTCARD;
+      if (ippContainsString(attr, "receipt"))
+        data->kind |= PAPPL_KIND_RECEIPT;
+      if (ippContainsString(attr, "roll"))
+        data->kind |= PAPPL_KIND_ROLL;
+    }
+    else
+    {
+      data->kind = PAPPL_KIND_DOCUMENT;
+    }
+
+    // Supplies
+    data->has_supplies = ippFindAttribute(response, "marker-levels", IPP_TAG_INTEGER) != NULL || ippFindAttribute(response, "printer-supply", IPP_TAG_STRING) != NULL;
+
+    // Default icons
+    // TODO: Get real icons
     data->icons[0].data    = everywhere_sm_png;
     data->icons[0].datalen = sizeof(everywhere_sm_png);
 
@@ -197,33 +605,23 @@ LocalDriverCallback(
 
     data->icons[2].data    = everywhere_lg_png;
     data->icons[2].datalen = sizeof(everywhere_lg_png);
+
+    // Cleanup...
+    ippDelete(response);
+    httpClose(http);
   }
   else
   {
     // Use generic capabilities for a B&W laser printer...
 
-    // Dither arrays...
-    for (i = 0; i < 16; i ++)
-    {
-      // Apply gamma correction to dither array...
-      for (j = 0; j < 16; j ++)
-	data->gdither[i][j] = 255 - (int)(255.0 * pow(1.0 - dither[i][j] / 255.0, 0.4545));
-    }
-
-    memcpy(data->pdither, data->gdither, sizeof(data->pdither));
-
-    /* Default orientation and quality */
-    data->orient_default  = IPP_ORIENT_NONE;
-    data->quality_default = IPP_QUALITY_NORMAL;
-
-    /* Pages-per-minute for monochrome and color */
+    // Pages-per-minute for monochrome and color
     data->ppm = 8;
     if (strstr(driver_name, "_color") != NULL)
       data->ppm_color = 2;
     else
       data->ppm_color = 0;
 
-    /* Three resolutions - 150dpi, 300dpi (default), and 600dpi */
+    // Three resolutions - 150dpi, 300dpi (default), and 600dpi
     data->num_resolution  = 3;
     data->x_resolution[0] = 150;
     data->y_resolution[0] = 150;
@@ -233,11 +631,11 @@ LocalDriverCallback(
     data->y_resolution[2] = 600;
     data->x_default       = data->y_default = 300;
 
-    /* Media sizes */
+    // Media sizes
     data->num_media = sizeof(pclps_media) / sizeof(pclps_media[0]);
     memcpy(data->media, pclps_media, sizeof(pclps_media));
 
-    /* Media sources */
+    // Media sources
     data->num_source = 7;
     data->source[0]  = "default";
     data->source[1]  = "tray-1";
@@ -247,7 +645,7 @@ LocalDriverCallback(
     data->source[5]  = "manual";
     data->source[6]  = "envelope";
 
-    /* Media types */
+    // Media types
     data->num_type = 6;
     data->type[0]  = "stationery";
     data->type[1]  = "stationery-letterhead";
@@ -264,16 +662,16 @@ LocalDriverCallback(
 	cupsCopyString(data->media_ready[i].size_name, "env_10_4.125x9.5in", sizeof(data->media_ready[i].size_name));
     }
 
-    /* Duplex */
+    // Duplex
     if (strstr(driver_name, "_duplex") != NULL)
     {
-      /* 1-sided printing only */
+      // 1-sided printing only
       data->sides_supported = PAPPL_SIDES_ONE_SIDED;
       data->sides_default   = PAPPL_SIDES_ONE_SIDED;
     }
     else
     {
-      /* 1- or 2-sided printing */
+      // 1- or 2-sided printing
       data->sides_supported = PAPPL_SIDES_ONE_SIDED | PAPPL_SIDES_TWO_SIDED_LONG_EDGE | PAPPL_SIDES_TWO_SIDED_SHORT_EDGE;
       data->sides_default   = PAPPL_SIDES_TWO_SIDED_LONG_EDGE;
     }
@@ -282,13 +680,13 @@ LocalDriverCallback(
     {
       // PCL
 
-      /* Make and model name */
+      // Make and model name
       snprintf(data->make_and_model, sizeof(data->make_and_model), "Generic PCL%s", strstr(driver_name, "_duplex") != NULL ? " w/Duplexer" : "");
 
-      /* Native format */
+      // Native format
       data->format = "application/vnd.hp-pcl";
 
-      /* Icons */
+      // Icons
       data->icons[0].data    = pcl_sm_png;
       data->icons[0].datalen = sizeof(pcl_sm_png);
 
@@ -298,18 +696,18 @@ LocalDriverCallback(
       data->icons[2].data    = pcl_lg_png;
       data->icons[2].datalen = sizeof(pcl_lg_png);
 
-      /* Margins */
+      // Margins
       data->left_right = 635;	 // 1/4" left and right
       data->bottom_top = 1270;	 // 1/2" top and bottom
 
-      /* Three color spaces - black (1-bit and 8-bit) and grayscale */
-      data->raster_types = PAPPL_PWG_RASTER_TYPE_BLACK_1 | PAPPL_PWG_RASTER_TYPE_BLACK_8 | PAPPL_PWG_RASTER_TYPE_SGRAY_8;
+      // Three color spaces - black (1-bit and 8-bit) and grayscale
+      data->raster_types = PAPPL_RASTER_TYPE_BLACK_1 | PAPPL_RASTER_TYPE_BLACK_8 | PAPPL_RASTER_TYPE_SGRAY_8;
 
-      /* Color modes: auto (default), monochrome, and color */
+      // Color modes: auto (default), monochrome, and color
       data->color_supported = PAPPL_COLOR_MODE_AUTO | PAPPL_COLOR_MODE_AUTO_MONOCHROME | PAPPL_COLOR_MODE_MONOCHROME;
       data->color_default   = PAPPL_COLOR_MODE_AUTO;
 
-      /* Set callbacks */
+      // Set callbacks
       data->printfile_cb  = pclps_print;
       data->rendjob_cb    = pcl_rendjob;
       data->rendpage_cb   = pcl_rendpage;
@@ -323,13 +721,13 @@ LocalDriverCallback(
     {
       // PostScript
 
-      /* Make and model name */
+      // Make and model name
       snprintf(data->make_and_model, sizeof(data->make_and_model), "Generic %sPostScript%s", strstr(driver_name, "_color") != NULL ? "Color " : "", strstr(driver_name, "_duplex") != NULL ? " w/Duplexer" : "");
 
-      /* Native format */
+      // Native format
       data->format = "application/postscript";
 
-      /* Icons */
+      // Icons
       data->icons[0].data    = ps_sm_png;
       data->icons[0].datalen = sizeof(ps_sm_png);
 
@@ -339,18 +737,18 @@ LocalDriverCallback(
       data->icons[2].data    = ps_lg_png;
       data->icons[2].datalen = sizeof(ps_lg_png);
 
-      /* Margins */
+      // Margins
       data->left_right = 423;	 // 1/6" left and right
       data->bottom_top = 423;	 // 1/6" top and bottom
 
-      /* Four color spaces - black (1-bit and 8-bit), grayscale, and sRGB */
-      data->raster_types = PAPPL_PWG_RASTER_TYPE_BLACK_1 | PAPPL_PWG_RASTER_TYPE_BLACK_8 | PAPPL_PWG_RASTER_TYPE_SGRAY_8 | PAPPL_PWG_RASTER_TYPE_SRGB_8;
+      // Four color spaces - black (1-bit and 8-bit), grayscale, and sRGB
+      data->raster_types = PAPPL_RASTER_TYPE_BLACK_1 | PAPPL_RASTER_TYPE_BLACK_8 | PAPPL_RASTER_TYPE_SGRAY_8 | PAPPL_RASTER_TYPE_SRGB_8;
 
-      /* Color modes: auto (default), monochrome, and color */
+      // Color modes: auto (default), monochrome, and color
       data->color_supported = PAPPL_COLOR_MODE_AUTO | PAPPL_COLOR_MODE_AUTO_MONOCHROME | PAPPL_COLOR_MODE_COLOR | PAPPL_COLOR_MODE_MONOCHROME;
       data->color_default   = PAPPL_COLOR_MODE_AUTO;
 
-      /* Set callbacks */
+      // Set callbacks
       data->printfile_cb  = pclps_print;
       data->rendjob_cb    = ps_rendjob;
       data->rendpage_cb   = ps_rendpage;
