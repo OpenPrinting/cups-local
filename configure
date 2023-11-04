@@ -3950,7 +3950,7 @@ fi
 	if test "x$SYSTEMDDIR" = x
 then :
 
-	    DBUSDIR="$($PKGCONFIG --variable=systemd_util_dir systemd)"
+	    SYSTEMDDIR="$($PKGCONFIG --variable=systemd_util_dir systemd)"
 
 fi
 	if test "x$SYSTEMDDIR" = x

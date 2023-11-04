@@ -243,10 +243,10 @@ LocalDriverCallback(
     attr = ippFindAttribute(response, "document-format-supported", IPP_TAG_MIMETYPE);
     if (ippContainsString(attr, "application/pdf"))
       data->format = "application/pdf";
-    else if (ippContainsString(attr, "application/postscript"))
-      data->format = "application/postscript";
-    else if (ippContainsString(attr, "application/vnd.hp-pcl"))
-      data->format = "application/vnd.hp-pcl";
+    else if (ippContainsString(attr, "image/urf"))
+      data->format = "image/urf";
+    else if (ippContainsString(attr, "image/pwg-raster"))
+      data->format = "image/pwg-raster";
 
     // pages-per-minute[-color]
     data->ppm       = ippGetInteger(ippFindAttribute(response, "pages-per-minute", IPP_TAG_INTEGER), 0);

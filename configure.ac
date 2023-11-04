@@ -149,7 +149,7 @@ AS_IF([test "x$enable_dbus" != xno], [
 	    AC_MSG_ERROR([No default D-Bus directory found, use --with-dbusdir option.])
 	])
 	AS_IF([test "x$SYSTEMDDIR" = x], [
-	    DBUSDIR="$($PKGCONFIG --variable=systemd_util_dir systemd)"
+	    SYSTEMDDIR="$($PKGCONFIG --variable=systemd_util_dir systemd)"
 	])
 	AS_IF([test "x$SYSTEMDDIR" = x], [
 	    AC_MSG_ERROR([No default systemd directory found, use --with-systemddir option.])
