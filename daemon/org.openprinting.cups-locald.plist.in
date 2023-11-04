@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>org.openprinting.cups-locald</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>@sbindir@/cups-locald</string>
+	</array>
+	<key>Sockets</key>
+	<dict>
+		<key>Listeners</key>
+		<array>
+			<dict>
+				<key>SecureSocketWithKey</key>
+				<string>CUPS_SERVER</string>
+			</dict>
+		</array>
+	</dict>
+</dict>
+</plist>

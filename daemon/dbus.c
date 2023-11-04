@@ -14,12 +14,12 @@
 
 //
 // The D-Bus API is used to start cups-locald and return the proper Unix
-// domain socket to use.  The interface is "org.openprinting.cups-locald".
+// domain socket to use.
 //
-// Method: GetSocket
-//
-// Get the Unix domain socket path for the current session.  There are no
-// arguments.  The reply contains a single string containing the socket path.
+// node /org/openprinting
+//   interface org.openprinting.cups-locald
+//     methods:
+//       GetSocket(out s socketpath);
 //
 
 

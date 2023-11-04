@@ -57,6 +57,22 @@ install:
 	echo Installing cups-locald to $(BUILDROOT)$(sbindir)
 	$(INSTALL_DIR) -m 755 $(BUILDROOT)$(sbindir)
 	$(INSTALL_BIN) cups-locald $(BUILDROOT)$(sbindir)
+	if test "x$(DBUSDIR)" != x; then \
+		echo Installing D-Bus files to $(BUILDROOT)$(DBUSDIR); \
+		$(INSTALL_DIR) -m 755 $(BUILDROOT)$(DBUSDIR)/interfaces; \
+		$(INSTALL_DATA) org.openprinting.cups-locald.xml $(BUILDROOT)$(DBUSDIR)/interfaces; \
+		$(INSTALL_DIR) -m 755 $(BUILDROOT)$(DBUSDIR)/services; \
+		$(INSTALL_DATA) cups-locald-dbus.service $(BUILDROOT)$(DBUSDIR)/services/cups-locald.service; \
+	fi
+	if test "x$$(uname)" = xDarwin; then \
+		echo Installing launchd files to $(BUILDROOT)/Library/LaunchAgents; \
+		$(INSTALL_DIR) -m 755 $(BUILDROOT)/Library/LaunchAgents; \
+		$(INSTALL_DATA) org.openprinting.cups-locald.plist $(BUILDROOT)/Library/LaunchAgents; \
+	elif test "x$(SYSTEMDDIR)" != x; then \
+		echo Installing systemd files to $(BUILDROOT)$(SYSTEMDDIR); \
+		$(INSTALL_DIR) -m 755 $(BUILDROOT)$(SYSTEMDDIR)/user; \
+		$(INSTALL_DATA) cups-locald-systemd.service $(BUILDROOT)$(SYSTEMDDIR)/user/cups-locald.service; \
+	fi
 
 
 #
@@ -66,6 +82,19 @@ install:
 uninstall:
 	$(RM) $(BUILDROOT)$(sbindir)/cups-locald
 	-$(RMDIR) $(BUILDROOT)$(sbindir)
+	if test "x$(DBUSDIR)" != x; then \
+		$(RM) $(BUILDROOT)$(DBUSDIR)/interfaces/org.openprinting.cups-locald.xml; \
+		$(RMDIR) $(BUILDROOT)$(DBUSDIR)/interfaces; \
+		$(RM) $(BUILDROOT)$(DBUSDIR)/services/cups-locald.service; \
+		$(RMDIR) $(BUILDROOT)$(DBUSDIR)/services; \
+	fi
+	if test "x$$(uname)" = xDarwin; then \
+		$(RM) $(BUILDROOT)/Library/LaunchAgents/org.openprinting.cups-locald.plist; \
+		$(RMDIR) $(BUILDROOT)/Library/LaunchAgents; \
+	elif test "x$(SYSTEMDDIR)" != x; then \
+		$(RM) $(BUILDROOT)$(SYSTEMDDIR)/user/cups-locald.service; \
+		$(RMDIR) $(BUILDROOT)$(SYSTEMDDIR)/user; \
+	fi
 
 
 #

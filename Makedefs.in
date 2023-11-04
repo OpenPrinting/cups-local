@@ -65,6 +65,7 @@ sysconfdir	=	@sysconfdir@
 top_srcdir	=	@top_srcdir@
 CUPS_LOCAL_DATADIR =	@CUPS_LOCAL_DATADIR@
 DBUSDIR		=	@DBUSDIR@
+SYSTEMDDIR	=	@SYSTEMDDIR@
 
 BUILDROOT	=	$(DSTROOT)$(RPM_BUILD_ROOT)$(DESTDIR)
 

@@ -105,16 +105,34 @@ AS_IF([$PKGCONFIG --exists pappl --atleast-version=2.0], [
 
 dnl Check for DBUS support
 DBUSDIR=""
+SYSTEMDDIR=""
 
 AC_ARG_ENABLE([dbus], AS_HELP_STRING([--disable-dbus], [build without D-Bus support]))
 AC_ARG_WITH([dbusdir], AS_HELP_STRING([--with-dbusdir], [set D-Bus configuration directory]), [
     DBUSDIR="$withval"
+])
+AC_ARG_WITH([systemddir], AS_HELP_STRING([--with-systemddir], [set systemd configuration directory]), [
+    SYSTEMDDIR="$withval"
 ])
 
 AS_IF([test "x$enable_dbus" != xno], [
     AC_MSG_CHECKING([for D-Bus])
     AS_IF([$PKGCONFIG --exists dbus-1], [
 	AC_MSG_RESULT([yes])
+    	have_dbus=1
+    ], [
+	AC_MSG_RESULT([no])
+        have_dbus=0
+    ])
+    AC_MSG_CHECKING([for systemd])
+    AS_IF([$PKGCONFIG --exists systemd], [
+	AC_MSG_RESULT([yes])
+        have_systemd=1
+    ], [
+	AC_MSG_RESULT([no])
+        have_systemd=0
+    ])
+    AS_IF([test $have_dbus = 1 -a $have_systemd = 1], [
 	AC_DEFINE([HAVE_DBUS], [1], [Have dbus library?])
 	CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags dbus-1) -DDBUS_API_SUBJECT_TO_CHANGE"
 	LIBS="$($PKGCONFIG --libs dbus-1) $LIBS"
@@ -124,19 +142,25 @@ AS_IF([test "x$enable_dbus" != xno], [
 	AC_CHECK_FUNC([dbus_threads_init_default], [
 	    AC_DEFINE([HAVE_DBUS_THREADS_INIT], [1], [Have dbus_threads_init_default function?])
 	])
-	AS_IF([test -d /etc/dbus-1 -a "x$DBUSDIR" = x], [
-	    DBUSDIR="/etc/dbus-1"
-	], [test -d /usr/local/etc/dbus-1 -a "x$DBUSDIR" = x], [
-	    DBUSDIR="/usr/local/etc/dbus-1"
-	], [test "x$DBUSDIR" = x], [
-	    AC_MSG_ERROR([No default D-Bus directory found, use --with-dbus-dir option.])
+	AS_IF([test "x$DBUSDIR" = x], [
+	    DBUSDIR="$($PKGCONFIG --variable=datadir dbus-1)/dbus-1"
 	])
-    ], [
-	AC_MSG_RESULT([no])
+	AS_IF([test "x$DBUSDIR" = x], [
+	    AC_MSG_ERROR([No default D-Bus directory found, use --with-dbusdir option.])
+	])
+	AS_IF([test "x$SYSTEMDDIR" = x], [
+	    DBUSDIR="$($PKGCONFIG --variable=systemd_util_dir systemd)"
+	])
+	AS_IF([test "x$SYSTEMDDIR" = x], [
+	    AC_MSG_ERROR([No default systemd directory found, use --with-systemddir option.])
+	])
+    ], [test "$xenable_dbus" = xyes], [
+	AC_MSG_ERROR([Required D-Bus library and systemd are missing.])
     ])
 ])
 
 AC_SUBST([DBUSDIR])
+AC_SUBST([SYSTEMDDIR])
 
 
 dnl Extra compiler options...
@@ -272,7 +296,8 @@ AC_SUBST([CUPS_LOCAL_DATADIR])
 dnl Generate a bunch of files...
 AC_CONFIG_FILES([
     Makedefs
-    daemon/cups-locald.service
     daemon/cups-locald-dbus.service
+    daemon/cups-locald-systemd.service
+    daemon/org.openprinting.cups-locald.plist
 ])
 AC_OUTPUT

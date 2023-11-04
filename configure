@@ -620,6 +620,7 @@ LIBOBJS
 CUPS_LOCAL_DATADIR
 WARNINGS
 CSFLAGS
+SYSTEMDDIR
 DBUSDIR
 PKGCONFIG
 INSTALL
@@ -689,6 +690,7 @@ ac_user_opts='
 enable_option_checking
 enable_dbus
 with_dbusdir
+with_systemddir
 enable_debug
 enable_maintainer
 enable_sanitizer
@@ -1333,6 +1335,7 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-dbusdir          set D-Bus configuration directory
+  --with-systemddir       set systemd configuration directory
   --with-ldflags=...      Specify additional LDFLAGS
 
 Some influential environment variables:
@@ -3841,6 +3844,7 @@ fi
 
 
 DBUSDIR=""
+SYSTEMDDIR=""
 
 # Check whether --enable-dbus was given.
 if test ${enable_dbus+y}
@@ -3858,6 +3862,15 @@ then :
 fi
 
 
+# Check whether --with-systemddir was given.
+if test ${with_systemddir+y}
+then :
+  withval=$with_systemddir;
+    SYSTEMDDIR="$withval"
+
+fi
+
+
 
 if test "x$enable_dbus" != xno
 then :
@@ -3869,6 +3882,34 @@ then :
 
 	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
+    	have_dbus=1
+
+else $as_nop
+
+	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        have_dbus=0
+
+fi
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for systemd" >&5
+printf %s "checking for systemd... " >&6; }
+    if $PKGCONFIG --exists systemd
+then :
+
+	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+        have_systemd=1
+
+else $as_nop
+
+	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        have_systemd=0
+
+fi
+    if test $have_dbus = 1 -a $have_systemd = 1
+then :
+
 
 printf "%s\n" "#define HAVE_DBUS 1" >>confdefs.h
 
@@ -3894,31 +3935,40 @@ printf "%s\n" "#define HAVE_DBUS_THREADS_INIT 1" >>confdefs.h
 
 fi
 
-	if test -d /etc/dbus-1 -a "x$DBUSDIR" = x
+	if test "x$DBUSDIR" = x
 then :
 
-	    DBUSDIR="/etc/dbus-1"
+	    DBUSDIR="$($PKGCONFIG --variable=datadir dbus-1)/dbus-1"
 
-elif test -d /usr/local/etc/dbus-1 -a "x$DBUSDIR" = x
+fi
+	if test "x$DBUSDIR" = x
 then :
 
-	    DBUSDIR="/usr/local/etc/dbus-1"
+	    as_fn_error $? "No default D-Bus directory found, use --with-dbusdir option." "$LINENO" 5
 
-elif test "x$DBUSDIR" = x
+fi
+	if test "x$SYSTEMDDIR" = x
 then :
 
-	    as_fn_error $? "No default D-Bus directory found, use --with-dbus-dir option." "$LINENO" 5
+	    DBUSDIR="$($PKGCONFIG --variable=systemd_util_dir systemd)"
+
+fi
+	if test "x$SYSTEMDDIR" = x
+then :
+
+	    as_fn_error $? "No default systemd directory found, use --with-systemddir option." "$LINENO" 5
 
 fi
 
-else $as_nop
+elif test "$xenable_dbus" = xyes
+then :
 
-	{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
+	as_fn_error $? "Required D-Bus library and systemd are missing." "$LINENO" 5
+
+fi
 
 fi
 
-fi
 
 
 
@@ -4185,7 +4235,7 @@ printf "%s\n" "#define CUPS_LOCAL_DATADIR \"$datadir/cups-local\"" >>confdefs.h
 
 
 
-ac_config_files="$ac_config_files Makedefs daemon/cups-locald.service daemon/cups-locald-dbus.service"
+ac_config_files="$ac_config_files Makedefs daemon/cups-locald-dbus.service daemon/cups-locald-systemd.service daemon/org.openprinting.cups-locald.plist"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -4874,8 +4924,9 @@ do
   case $ac_config_target in
     "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
     "Makedefs") CONFIG_FILES="$CONFIG_FILES Makedefs" ;;
-    "daemon/cups-locald.service") CONFIG_FILES="$CONFIG_FILES daemon/cups-locald.service" ;;
     "daemon/cups-locald-dbus.service") CONFIG_FILES="$CONFIG_FILES daemon/cups-locald-dbus.service" ;;
+    "daemon/cups-locald-systemd.service") CONFIG_FILES="$CONFIG_FILES daemon/cups-locald-systemd.service" ;;
+    "daemon/org.openprinting.cups-locald.plist") CONFIG_FILES="$CONFIG_FILES daemon/org.openprinting.cups-locald.plist" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
