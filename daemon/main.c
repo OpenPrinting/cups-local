@@ -213,11 +213,21 @@ main(int  argc,				// I - Number of command-line arguments
 
   papplSystemSetSaveCallback(system, (pappl_save_cb_t)papplSystemSaveState, (void *)LocalStateFile);
 
-  // Setup domain socket listener
+  // Setup domain socket and loopback listeners
   papplSystemAddListeners(system, LocalSocket);
+  papplSystemAddListeners(system, "localhsot");
 
   // Setup the generic drivers...
   papplSystemSetPrinterDrivers(system, sizeof(LocalDrivers) / sizeof(LocalDrivers[0]), LocalDrivers, LocalDriverAutoAdd, /* create_cb */NULL, LocalDriverCallback, NULL);
+
+  papplSystemAddMIMEFilter(system, "application/pdf", "application/pdf", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "application/pdf", "image/pwg-raster", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "application/pdf", "image/urf", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "image/jpeg", "application/pdf", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "image/png", "application/pdf", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "text/plain", "application/pdf", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "text/plain", "image/pwg-raster", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "text/plain", "image/urf", LocalTransformFilter, NULL);
 
 #ifdef HAVE_DBUS
   // Start a background thread for D-Bus...
