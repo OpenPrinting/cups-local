@@ -19,7 +19,6 @@ extern char **environ;
 //
 
 static void	process_attr_message(pappl_job_t *job, char *message);
-static void	process_state_message(pappl_job_t *job, char *message);
 
 
 //
@@ -253,14 +252,9 @@ LocalTransformFilter(
 	    valptr ++;
 
           // Parse line...
-	  if (!strncmp(line, "STATE:", 6))
+	  if (!strncmp(line, "ATTR:", 5))
 	  {
-	    // Process printer-state-reasons keywords.
-	    process_state_message(job, valptr);
-	  }
-	  else if (!strncmp(line, "ATTR:", 5))
-	  {
-	    // Process job/printer attribute update.
+	    // Process job attribute update.
 	    process_attr_message(job, valptr);
 	  }
 	  else if (!strncmp(line, "ERROR:", 6))
@@ -345,219 +339,19 @@ process_attr_message(
     pappl_job_t *job,			// I - Job
     char        *message)		// I - Message
 {
-  (void)job;
-  (void)message;
-
-#if 0
-  size_t	i,			// Looping var
-		num_options = 0;	// Number of name=value pairs
-  cups_option_t	*options = NULL,	// name=value pairs from message
-		*option;		// Current option
-  ipp_attribute_t *attr;		// Current attribute
+  size_t	num_options = 0;	// Number of name=value pairs
+  cups_option_t	*options = NULL;	// name=value pairs from message
+  int		value;			// Impressions value
 
 
- /*
-  * Grab attributes from the message line...
-  */
+  // Grab attributes from the message line...
+  num_options = cupsParseOptions(message, num_options, &options);
 
-  serverLogJob(SERVER_LOGLEVEL_DEBUG, job, "%s", message);
+  if ((value = cupsGetIntegerOption("job-impressions", num_options, options)) > 0)
+    papplJobSetImpressions(job, value);
 
-  num_options = cupsParseOptions(message + 5, num_options, &options);
-
-  serverLogJob(SERVER_LOGLEVEL_DEBUG, job, "num_options=%u", (unsigned)num_options);
-
- /*
-  * Loop through the options and record them in the printer or job objects...
-  */
-
-  for (i = num_options, option = options; i > 0; i --, option ++)
-  {
-    serverLogJob(SERVER_LOGLEVEL_DEBUG, job, "options[%u].name=\"%s\", .value=\"%s\"", (unsigned)(num_options - i), option->name, option->value);
-
-    if (!strcmp(option->name, "job-impressions"))
-    {
-     /*
-      * Update job-impressions attribute...
-      */
-
-      serverLogJob(SERVER_LOGLEVEL_DEBUG, job, "Setting Job Status attribute \"%s\" to \"%s\".", option->name, option->value);
-
-      cupsRWLockWrite(&job->rwlock);
-
-      job->impressions = atoi(option->value);
-
-      cupsRWUnlock(&job->rwlock);
-    }
-    else if (mode == SERVER_TRANSFORM_COMMAND && !strcmp(option->name, "job-impressions-completed"))
-    {
-     /*
-      * Update job-impressions-completed attribute...
-      */
-
-      serverLogJob(SERVER_LOGLEVEL_DEBUG, job, "Setting Job Status attribute \"%s\" to \"%s\".", option->name, option->value);
-
-      cupsRWLockWrite(&job->rwlock);
-
-      job->impcompleted = atoi(option->value);
-
-      cupsRWUnlock(&job->rwlock);
-    }
-    else if (!strcmp(option->name, "job-impressions-col") || !strcmp(option->name, "job-media-sheets") || !strcmp(option->name, "job-media-sheets-col") ||
-        (mode == SERVER_TRANSFORM_COMMAND && (!strcmp(option->name, "job-impressions-completed-col") || !strcmp(option->name, "job-media-sheets-completed") || !strcmp(option->name, "job-media-sheets-completed-col"))))
-    {
-     /*
-      * Update Job Status attribute...
-      */
-
-      serverLogJob(SERVER_LOGLEVEL_DEBUG, job, "Setting Job Status attribute \"%s\" to \"%s\".", option->name, option->value);
-
-      cupsRWLockWrite(&job->rwlock);
-
-      if ((attr = ippFindAttribute(job->attrs, option->name, IPP_TAG_ZERO)) != NULL)
-        ippDeleteAttribute(job->attrs, attr);
-
-      cupsEncodeOption(job->attrs, IPP_TAG_JOB, option->name, option->value);
-
-      cupsRWUnlock(&job->rwlock);
-    }
-    else if (!strncmp(option->name, "marker-", 7) || !strcmp(option->name, "printer-alert") || !strcmp(option->name, "printer-supply") || !strcmp(option->name, "printer-supply-description"))
-    {
-     /*
-      * Update Printer Status attribute...
-      */
-
-      serverLogPrinter(SERVER_LOGLEVEL_DEBUG, job->printer, "Setting Printer Status attribute \"%s\" to \"%s\".", option->name, option->value);
-
-      cupsRWLockWrite(&job->printer->rwlock);
-
-      if ((attr = ippFindAttribute(job->printer->pinfo.attrs, option->name, IPP_TAG_ZERO)) != NULL)
-        ippDeleteAttribute(job->printer->pinfo.attrs, attr);
-
-      cupsEncodeOption(job->printer->pinfo.attrs, IPP_TAG_PRINTER, option->name, option->value);
-
-      cupsRWUnlock(&job->printer->rwlock);
-    }
-    else
-    {
-     /*
-      * Something else that isn't currently supported...
-      */
-
-      serverLogJob(SERVER_LOGLEVEL_DEBUG, job, "Ignoring attribute \"%s\" with value \"%s\".", option->name, option->value);
-    }
-  }
+  if ((value = cupsGetIntegerOption("job-impressions-completed", num_options, options)) > 0)
+    papplJobSetImpressionsCompleted(job, value);
 
   cupsFreeOptions(num_options, options);
-#endif // 0
-}
-
-
-//
-// 'process_state_message()' - Process a STATE: message from a command.
-//
-
-static void
-process_state_message(
-    pappl_job_t *job,			// I - Job
-    char        *message)		// I - Message
-{
-  (void)job;
-  (void)message;
-
-#if 0
-  int		i;			// Looping var
-  server_preason_t preasons,		// printer-state-reasons values
-		pbit;			// Current printer reason bit
-  server_jreason_t jreasons,		// job-state-reasons values
-		jbit;			// Current job reason bit
-  char		*ptr,			// Pointer into message
-		*next;			// Next keyword in message
-  int		remove;			// Non-zero if we are removing keywords
-
-
- /*
-  * Skip leading "STATE:" and any whitespace...
-  */
-
-  for (message += 6; *message; message ++)
-    if (*message != ' ' && *message != '\t')
-      break;
-
- /*
-  * Support the following forms of message:
-  *
-  * "keyword[,keyword,...]" to set the job/printer-state-reasons value(s).
-  *
-  * "-keyword[,keyword,...]" to remove keywords.
-  *
-  * "+keyword[,keyword,...]" to add keywords.
-  *
-  * Keywords may or may not have a suffix (-report, -warning, -error) per
-  * RFC 8011.
-  */
-
-  if (*message == '-')
-  {
-    remove   = 1;
-    jreasons = job->state_reasons;
-    preasons = job->printer->state_reasons;
-    message ++;
-  }
-  else if (*message == '+')
-  {
-    remove   = 0;
-    jreasons = job->state_reasons;
-    preasons = job->printer->state_reasons;
-    message ++;
-  }
-  else
-  {
-    remove   = 0;
-    jreasons = job->state_reasons;
-    preasons = SERVER_PREASON_NONE;
-  }
-
-  while (*message)
-  {
-    if ((next = strchr(message, ',')) != NULL)
-      *next++ = '\0';
-
-    for (i = 0, jbit = 1; i < (int)(sizeof(server_jreasons) / sizeof(server_jreasons[0])); i ++, jbit *= 2)
-    {
-      if (!strcmp(message, server_jreasons[i]))
-      {
-        if (remove)
-	  jreasons &= ~jbit;
-	else
-	  jreasons |= jbit;
-      }
-    }
-
-    if ((ptr = strstr(message, "-error")) != NULL)
-      *ptr = '\0';
-    else if ((ptr = strstr(message, "-report")) != NULL)
-      *ptr = '\0';
-    else if ((ptr = strstr(message, "-warning")) != NULL)
-      *ptr = '\0';
-
-    for (i = 0, pbit = 1; i < (int)(sizeof(server_preasons) / sizeof(server_preasons[0])); i ++, pbit *= 2)
-    {
-      if (!strcmp(message, server_preasons[i]))
-      {
-        if (remove)
-	  preasons &= ~pbit;
-	else
-	  preasons |= pbit;
-      }
-    }
-
-    if (next)
-      message = next;
-    else
-      break;
-  }
-
-  job->state_reasons          = jreasons;
-  job->printer->state_reasons = preasons;
-#endif // 0
 }
