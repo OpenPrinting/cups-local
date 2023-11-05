@@ -8,6 +8,7 @@
 //
 
 #include "cups-locald.h"
+#include <cups/thread.h>
 #include "icons.h"
 #include <math.h>
 
@@ -44,6 +45,8 @@ typedef struct pcl_map_s		// PWG name to PCL code map
 // Local globals...
 //
 
+static cups_array_t	*string_pool = NULL;
+static cups_mutex_t	string_mutex = CUPS_MUTEX_INITIALIZER;
 static const char * const pclps_media[] =
 {       // Supported media sizes for Generic PCL/PostScript printers
   "na_ledger_11x17in",
@@ -75,6 +78,8 @@ static bool	eve_rwriteline(pappl_job_t *job, pappl_pr_options_t *options, pappl_
 static bool	eve_status(pappl_printer_t *printer);
 static bool	eve_update_status(pappl_printer_t *printer, pappl_device_t *device);
 #endif // 0
+
+static const char *get_string(const char *s);
 
 static void	pcl_compress_data(pcl_data_t *pcl, pappl_device_t *device, unsigned y, const unsigned char *line, unsigned length);
 static bool	pcl_rendjob(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device);
@@ -335,9 +340,8 @@ LocalDriverCallback(
         count = PAPPL_MAX_MEDIA;
 
       data->num_media = count;
-      // TODO: Add cups-locald string pool
       for (i = 0; i < count; i ++)
-        data->media[i] = strdup(ippGetString(attr, i, NULL));
+        data->media[i] = get_string(ippGetString(attr, i, NULL));
     }
     else
     {
@@ -370,9 +374,8 @@ LocalDriverCallback(
         count = PAPPL_MAX_SOURCE;
 
       data->num_source = count;
-      // TODO: Add cups-locald string pool
       for (i = 0; i < count; i ++)
-        data->source[i] = strdup(ippGetString(attr, i, NULL));
+        data->source[i] = get_string(ippGetString(attr, i, NULL));
     }
     else
     {
@@ -391,9 +394,8 @@ LocalDriverCallback(
         count = PAPPL_MAX_TYPE;
 
       data->num_type = count;
-      // TODO: Add cups-locald string pool
       for (i = 0; i < count; i ++)
-        data->type[i] = strdup(ippGetString(attr, i, NULL));
+        data->type[i] = get_string(ippGetString(attr, i, NULL));
     }
     else
     {
@@ -761,6 +763,30 @@ LocalDriverCallback(
   }
 
   return (true);
+}
+
+
+//
+// 'get_string()' - Get or allocate a string in the pool.
+//
+
+static const char *			// O - String from pool
+get_string(const char *s)		// I - String to save
+{
+  const char	*ret;			// Return value
+
+
+  cupsMutexLock(&string_mutex);
+  if (!string_pool)
+    string_pool = cupsArrayNewStrings(NULL, '\0');
+  if ((ret = cupsArrayFind(string_pool, (void *)s)) == NULL)
+  {
+    cupsArrayAdd(string_pool, (void *)s);
+    ret = cupsArrayFind(string_pool, (void *)s);
+  }
+  cupsMutexUnlock(&string_mutex);
+
+  return (ret);
 }
 
 
