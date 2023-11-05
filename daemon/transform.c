@@ -10,6 +10,7 @@
 #include "cups-locald.h"
 #include <poll.h>
 #include <spawn.h>
+#include <sys/wait.h>
 extern char **environ;
 
 
