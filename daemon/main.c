@@ -221,11 +221,15 @@ main(int  argc,				// I - Number of command-line arguments
   papplSystemSetPrinterDrivers(system, sizeof(LocalDrivers) / sizeof(LocalDrivers[0]), LocalDrivers, LocalDriverAutoAdd, /* create_cb */NULL, LocalDriverCallback, NULL);
 
   papplSystemAddMIMEFilter(system, "application/pdf", "application/pdf", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "application/pdf", "application/postscript", LocalTransformFilter, NULL);
   papplSystemAddMIMEFilter(system, "application/pdf", "image/pwg-raster", LocalTransformFilter, NULL);
   papplSystemAddMIMEFilter(system, "application/pdf", "image/urf", LocalTransformFilter, NULL);
   papplSystemAddMIMEFilter(system, "image/jpeg", "application/pdf", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "image/jpeg", "application/postscript", LocalTransformFilter, NULL);
   papplSystemAddMIMEFilter(system, "image/png", "application/pdf", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "image/png", "application/postscript", LocalTransformFilter, NULL);
   papplSystemAddMIMEFilter(system, "text/plain", "application/pdf", LocalTransformFilter, NULL);
+  papplSystemAddMIMEFilter(system, "text/plain", "application/postscript", LocalTransformFilter, NULL);
   papplSystemAddMIMEFilter(system, "text/plain", "image/pwg-raster", LocalTransformFilter, NULL);
   papplSystemAddMIMEFilter(system, "text/plain", "image/urf", LocalTransformFilter, NULL);
 
