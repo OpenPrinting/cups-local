@@ -10,6 +10,9 @@
 #define CUPS_LOCAL_MAIN_C
 #include "cups-locald.h"
 #include <cups/thread.h>
+#ifdef __APPLE__
+#  include <launch.h>
+#endif // __APPLE__
 
 
 //
@@ -214,8 +217,38 @@ main(int  argc,				// I - Number of command-line arguments
   papplSystemSetSaveCallback(system, (pappl_save_cb_t)papplSystemSaveState, (void *)LocalStateFile);
 
   // Setup domain socket and loopback listeners
+#ifdef __APPLE__
+  if (!strcmp(LocalSocket, "launchd"))
+  {
+    // Support sockets from launchd...
+    int		error;			// Check-in error, if any
+    size_t	i,			// Looping var
+		ld_count;		// Number of listeners
+    int		*ld_sockets;		// Listener sockets
+
+    if ((error = launch_activate_socket("Listeners", &ld_sockets, &ld_count)) != 0)
+    {
+      cupsLangPrintf(stderr, _("cups-locald: Unable to get listener sockets: %s"), strerror(error));
+      return (1);
+    }
+
+    for (i = 0; i < ld_count; i ++)
+    {
+      http_addr_t	addr;		// Socket address
+      socklen_t		addrlen;	// Length of socket address
+
+      papplSystemAddListenerFd(system, ld_sockets[i]);
+
+      addrlen = sizeof(addr);
+      if (!getsockname(ld_sockets[i], (struct sockaddr *)&addr, &addrlen) && addr.addr.sa_family == AF_LOCAL)
+        httpAddrGetString(&addr, LocalSocket, sizeof(LocalSocket));
+    }
+  }
+  else
+#endif // __APPLE__
   papplSystemAddListeners(system, LocalSocket);
-  papplSystemAddListeners(system, "localhsot");
+
+  papplSystemAddListeners(system, "localhost");
 
   // Setup the generic drivers...
   papplSystemSetPrinterDrivers(system, sizeof(LocalDrivers) / sizeof(LocalDrivers[0]), LocalDrivers, LocalDriverAutoAdd, /* create_cb */NULL, LocalDriverCallback, NULL);
