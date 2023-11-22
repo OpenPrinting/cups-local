@@ -18,6 +18,7 @@ jobs:
         with:
           repository: OpenPrinting/libcups
           path: libcups
+          submodules: recursive
       - name: Configure libcups3
         run: cd libcups; ./configure --enable-debug
       - name: Build/install libcups3
@@ -27,6 +28,7 @@ jobs:
         with:
           repository: michaelrsweet/pappl
           path: pappl
+          submodules: recursive
       - name: Configure PAPPL
         run: cd pappl; ./configure --enable-debug --disable-shared
       - name: Build/Install PAPPL
