@@ -88,7 +88,7 @@ static bool	pcl_rstartjob(pappl_job_t *job, pappl_pr_options_t *options, pappl_d
 static bool	pcl_rstartpage(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device, unsigned page);
 static bool	pcl_rwriteline(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device, unsigned y, const unsigned char *pixels);
 
-static bool	pclps_print(pappl_job_t *job, pappl_pr_options_t *options, pappl_device_t *device);
+static bool	pclps_print(pappl_job_t *job, int doc_number, pappl_pr_options_t *options, pappl_device_t *device);
 static bool	pclps_status(pappl_printer_t *printer);
 static bool	pclps_update_status(pappl_printer_t *printer, pappl_device_t *device);
 
@@ -1285,6 +1285,7 @@ pcl_rwriteline(
 static bool				// O - `true` on success, `false` on failure
 pclps_print(
     pappl_job_t        *job,		// I - Job
+    int                doc_number,	// I - Document number (`1`-based)
     pappl_pr_options_t *options,	// I - Options
     pappl_device_t     *device)		// I - Device
 {
@@ -1297,7 +1298,7 @@ pclps_print(
 
   papplJobSetImpressions(job, 1);
 
-  fd = open(papplJobGetFilename(job), O_RDONLY);
+  fd = open(papplJobGetDocumentFilename(job, doc_number), O_RDONLY);
 
   while ((bytes = read(fd, buffer, sizeof(buffer))) > 0)
   {

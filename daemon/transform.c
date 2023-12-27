@@ -27,9 +27,11 @@ static void	process_attr_message(pappl_job_t *job, char *message);
 
 bool					// O - `true` on success, `false` on failure
 LocalTransformFilter(
-    pappl_job_t    *job,		// I - Job
-    pappl_device_t *device,		// I - Output device
-    void           *cbdata)		// I - Callback data (not used)
+    pappl_job_t        *job,		// I - Job
+    int                doc_number,	// I - Document number (1-based)
+    pappl_pr_options_t *options,	// I - Print options
+    pappl_device_t     *device,		// I - Output device
+    void               *cbdata)		// I - Callback data (not used)
 {
   size_t		i;		// Looping var
   pappl_printer_t	*printer;	// Printer for job
@@ -83,7 +85,7 @@ LocalTransformFilter(
 
   // Setup the command-line arguments...
   xargv[0] = "ipptransform";
-  xargv[1] = papplJobGetFilename(job);
+  xargv[1] = papplJobGetDocumentFilename(job, doc_number);
   xargv[2] = NULL;
 
   // Copy the current environment, then add environment variables for every
@@ -97,7 +99,7 @@ LocalTransformFilter(
     goto transform_failure;
   }
 
-  if (asprintf(xenvp + xenvc, "CONTENT_TYPE=%s", papplJobGetFormat(job)) > 0)
+  if (asprintf(xenvp + xenvc, "CONTENT_TYPE=%s", papplJobGetDocumentFormat(job, doc_number)) > 0)
     xenvc ++;
 
   if (pdata.format && asprintf(xenvp + xenvc, "OUTPUT_TYPE=%s", pdata.format) > 0)
@@ -141,8 +143,11 @@ LocalTransformFilter(
     // value(s) from the attribute.
     const char *name;			// Attribute name
 
-    if ((attr = papplJobGetAttribute(job, jattrs[i])) == NULL)
-      continue;
+    if ((attr = papplJobGetDocumentAttribute(job, doc_number, jattrs[i])) == NULL)
+    {
+      if ((attr = papplJobGetAttribute(job, jattrs[i])) == NULL)
+        continue;
+    }
 
     name   = ippGetName(attr);
     valptr = val;

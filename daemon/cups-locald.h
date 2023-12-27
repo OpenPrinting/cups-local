@@ -56,7 +56,7 @@ extern void		*LocalDBusService(void *data);
 
 extern const char	*LocalDriverAutoAdd(const char *device_info, const char *device_uri, const char *device_id, void *data);
 extern bool		LocalDriverCallback(pappl_system_t *system, const char *driver_name, const char *device_uri, const char *device_id, pappl_pr_driver_data_t *driver_data, ipp_t **driver_attrs, void *data);
-extern bool		LocalTransformFilter(pappl_job_t *job, pappl_device_t *device, void *data);
+extern bool		LocalTransformFilter(pappl_job_t *job, int doc_number, pappl_pr_options_t *options, pappl_device_t *device, void *data);
 
 
 #endif // !CUPS_LOCALD_H
