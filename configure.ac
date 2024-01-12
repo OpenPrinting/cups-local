@@ -1,7 +1,7 @@
 dnl
 dnl Configuration script for the CUPS commands.
 dnl
-dnl Copyright © 2022-2023 by OpenPrinting.
+dnl Copyright © 2022-2024 by OpenPrinting.
 dnl
 dnl Licensed under Apache License v2.0.  See the file "LICENSE" for more
 dnl information.
