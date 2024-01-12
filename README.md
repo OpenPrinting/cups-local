@@ -6,7 +6,7 @@ CUPS Local Services (cups-local)
 [![Build](https://github.com/OpenPrinting/cups-local/workflows/Build/badge.svg)](https://github.com/OpenPrinting/cups-local/actions/workflows/build.yml)
 [![Coverity Scan](https://img.shields.io/coverity/scan/NNNNN)](https://scan.coverity.com/projects/OpenPrinting-cups-local)
 
-> *Note:* This project is intended to be paired with the "libcups", and
+> *Note:* This project is intended to be paired with the "libcups" and
 > "cups-sharing" projects.  Right now all of this code should be considered
 > alpha-quality for testing purposes only!
 
@@ -36,7 +36,7 @@ The `man` subdirectory contains the manual pages for each of the commands.
 Legal Stuff
 -----------
 
-Copyright © 2020-2023 by OpenPrinting.
+Copyright © 2020-2024 by OpenPrinting.
 
 Copyright © 2007-2020 by Apple Inc.
 
