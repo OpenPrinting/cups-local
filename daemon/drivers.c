@@ -476,12 +476,13 @@ LocalDriverCallback(
     // Finishings
     if ((attr = ippFindAttribute(response, "finishings-supported", IPP_TAG_ENUM)) != NULL)
     {
+      // Update to support all finishings in PAPPL 2.x...
       if (ippContainsInteger(attr, IPP_FINISHINGS_PUNCH))
-        data->finishings |= PAPPL_FINISHINGS_PUNCH;
+        data->finishings_supported |= PAPPL_FINISHINGS_PUNCH;
       if (ippContainsInteger(attr, IPP_FINISHINGS_STAPLE))
-        data->finishings |= PAPPL_FINISHINGS_STAPLE;
+        data->finishings_supported |= PAPPL_FINISHINGS_STAPLE;
       if (ippContainsInteger(attr, IPP_FINISHINGS_TRIM))
-        data->finishings |= PAPPL_FINISHINGS_TRIM;
+        data->finishings_supported |= PAPPL_FINISHINGS_TRIM;
     }
 
     // Color modes

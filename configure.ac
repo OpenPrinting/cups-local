@@ -81,7 +81,7 @@ dnl CUPS library v3
 AC_MSG_CHECKING([for CUPS library v3])
 AS_IF([$PKGCONFIG --exists cups3], [
     AC_MSG_RESULT([yes])
-    CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags cups3)"
+    CPPFLAGS="$($PKGCONFIG --cflags cups3) $CPPFLAGS"
     LIBS="$($PKGCONFIG --libs cups3) $LIBS"
 ], [
     AC_MSG_RESULT([no])
@@ -94,7 +94,7 @@ dnl PAPPL library...
 AC_MSG_CHECKING([for PAPPL library v2.0 or later])
 AS_IF([$PKGCONFIG --exists pappl2 --atleast-version=2.0], [
     AC_MSG_RESULT([yes])
-    CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags pappl2)"
+    CPPFLAGS="$($PKGCONFIG --cflags pappl2) $CPPFLAGS"
     LIBS="$($PKGCONFIG --libs pappl2) $LIBS"
 ], [
     AC_MSG_RESULT([no])
