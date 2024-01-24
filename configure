@@ -3830,7 +3830,7 @@ then :
 
     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 printf "%s\n" "yes" >&6; }
-    CPPFLAGS="$CFLAGS $($PKGCONFIG --cflags pappl2)"
+    CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags pappl2)"
     LIBS="$($PKGCONFIG --libs pappl2) $LIBS"
 
 else $as_nop

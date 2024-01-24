@@ -94,7 +94,7 @@ dnl PAPPL library...
 AC_MSG_CHECKING([for PAPPL library v2.0 or later])
 AS_IF([$PKGCONFIG --exists pappl2 --atleast-version=2.0], [
     AC_MSG_RESULT([yes])
-    CPPFLAGS="$CFLAGS $($PKGCONFIG --cflags pappl2)"
+    CPPFLAGS="$CPPFLAGS $($PKGCONFIG --cflags pappl2)"
     LIBS="$($PKGCONFIG --libs pappl2) $LIBS"
 ], [
     AC_MSG_RESULT([no])
