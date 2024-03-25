@@ -16,8 +16,8 @@
 // The D-Bus API is used to start cups-locald and return the proper Unix
 // domain socket to use.
 //
-// node /org/openprinting
-//   interface org.openprinting.cups-locald
+// node /org/openprinting/cupslocald
+//   interface org.openprinting.cupslocald
 //     methods:
 //       GetSocket(out s socketpath);
 //
@@ -55,7 +55,7 @@ LocalDBusService(void *data)		// I - Thread data (unused)
     // Parse any incoming messages...
     if ((msg = dbus_connection_pop_message(dbus)) != NULL)
     {
-      if (dbus_message_is_method_call(msg, "org.openprinting.cups-locald", "GetSocket"))
+      if (dbus_message_is_method_call(msg, "org.openprinting.cupslocald", "GetSocket"))
       {
         // Reply with the domain socket path...
 	DBusMessage	*reply;		// Reply message

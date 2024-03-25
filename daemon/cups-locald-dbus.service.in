@@ -1,4 +1,4 @@
 [D-BUS Service]
-Name=org.openprinting.cups-locald
+Name=org.openprinting.cupslocald
 Exec=@sbindir@/cups-locald
 SystemdService=org.openprinting.cups-locald
