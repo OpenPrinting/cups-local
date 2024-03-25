@@ -1,7 +1,7 @@
 //
 // D-Bus API support for cups-local.
 //
-// Copyright © 2023 by OpenPrinting.
+// Copyright © 2023-2024 by OpenPrinting.
 //
 // Licensed under Apache License v2.0.  See the file "LICENSE" for more
 // information.
@@ -38,8 +38,13 @@ LocalDBusService(void *data)		// I - Thread data (unused)
   (void)data;
 
   // Connect to the session bus...
+  dbus_error_init(&error);
+
   if ((dbus = dbus_bus_get(DBUS_BUS_SESSION, &error)) == NULL)
+  {
+    dbus_error_free(&error);
     return (NULL);
+  }
 
   // Read message until error/exit...
   for (;;)
