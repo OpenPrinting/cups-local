@@ -1,7 +1,7 @@
 #
 # Commands makefile for cups-local.
 #
-# Copyright © 2022-2023 by OpenPrinting.
+# Copyright © 2022-2024 by OpenPrinting.
 #
 # Licensed under Apache License v2.0.  See the file "LICENSE" for more
 # information.
@@ -15,21 +15,21 @@ TARGETS	=	\
 		cupsaccept \
 		lp \
 		lpadmin \
-#		lpc \
-#		lpmove \
-		lpoptions \
 		lpq \
 		lpstat
+#		lpc
+#		lpmove
+#		lpoptions
 OBJS	=	\
 		cancel.o \
 		cupsaccept.o \
 		lp.o \
 		lpadmin.o \
-#		lpc.o \
-#		lpmove.o \
-		lpoptions.o \
 		lpq.o \
 		lpstat.o
+#		lpc.o
+#		lpmove.o
+#		lpoptions.o
 
 
 #
@@ -72,7 +72,7 @@ install:
 	$(INSTALL_DIR) -m 755 $(BUILDROOT)$(bindir)
 	$(INSTALL_BIN) cancel $(BUILDROOT)$(bindir)
 	$(INSTALL_BIN) lp $(BUILDROOT)$(bindir)
-	$(INSTALL_BIN) lpoptions $(BUILDROOT)$(bindir)
+#	$(INSTALL_BIN) lpoptions $(BUILDROOT)$(bindir)
 	$(INSTALL_BIN) lpstat $(BUILDROOT)$(bindir)
 	$(RM) $(BUILDROOT)$(bindir)/lpq
 	$(LN) lpstat $(BUILDROOT)$(bindir)/lpq
