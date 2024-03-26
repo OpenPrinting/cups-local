@@ -1,14 +1,14 @@
 //
-// Common header for cups-local.
+// Common header for cupslocald.
 //
-// Copyright © 2023 by OpenPrinting.
+// Copyright © 2023-2024 by OpenPrinting.
 //
 // Licensed under Apache License v2.0.  See the file "LICENSE" for more
 // information.
 //
 
-#ifndef CUPS_LOCALD_H
-#  define CUPS_LOCALD_H 1
+#ifndef CUPSLOCALD_H
+#  define CUPSLOCALD_H 1
 #  include <config.h>
 #  include <pappl/pappl.h>
 
@@ -17,16 +17,16 @@
 // Globals...
 //
 
-#  ifdef CUPS_LOCAL_MAIN_C
+#  ifdef CUPSLOCALD_MAIN_C
 #    define VAR
 #    define VALUE(x)	=x
 #  else
 #    define VAR		extern
 #    define VALUE(x)
-#  endif // CUPS_LOCAL_MAIN_C
+#  endif // CUPSLOCALD_MAIN_C
 
 VAR pappl_pr_driver_t	LocalDrivers[7]
-#  ifdef CUPS_LOCAL_MAIN_C
+#  ifdef CUPSLOCALD_MAIN_C
 = {
   { "everywhere",      "IPP Everywhere™",                     NULL, NULL },
   { "pcl",             "Generic PCL",                         NULL, NULL },
@@ -36,7 +36,7 @@ VAR pappl_pr_driver_t	LocalDrivers[7]
   { "ps_duplex",       "Generic PostScript w/Duplexer",       NULL, NULL },
   { "ps_color_duplex", "Generic Color PostScript w/Duplexer", NULL, NULL }
 }
-#  endif // CUPS_LOCAL_MAIN_C
+#  endif // CUPSLOCALD_MAIN_C
 ;
 VAR char		LocalSocket[256] VALUE("");
 					// Domain socket path
@@ -59,4 +59,4 @@ extern bool		LocalDriverCallback(pappl_system_t *system, const char *driver_name
 extern bool		LocalTransformFilter(pappl_job_t *job, int doc_number, pappl_pr_options_t *options, pappl_device_t *device, void *data);
 
 
-#endif // !CUPS_LOCALD_H
+#endif // !CUPSLOCALD_H

@@ -18,8 +18,8 @@
 /config.log
 /config.status
 /configure~
-/daemon/cups-locald
-/daemon/cups-locald-dbus.service
-/daemon/cups-locald-systemd.service
-/daemon/org.openprinting.cups-locald.plist
+/daemon/cupslocald
+/daemon/cupslocald-dbus.service
+/daemon/cupslocald-systemd.service
+/daemon/org.openprinting.cupslocald.plist
 /Makedefs

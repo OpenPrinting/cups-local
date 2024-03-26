@@ -1,14 +1,14 @@
 //
-// Main entry for cups-local.
+// Main entry for cupslocald.
 //
-// Copyright © 2023 by OpenPrinting.
+// Copyright © 2023-2024 by OpenPrinting.
 //
 // Licensed under Apache License v2.0.  See the file "LICENSE" for more
 // information.
 //
 
-#define CUPS_LOCAL_MAIN_C
-#include "cups-locald.h"
+#define CUPSLOCALD_MAIN_C
+#include "cupslocald.h"
 #include <cups/thread.h>
 #ifdef __APPLE__
 #  include <launch.h>

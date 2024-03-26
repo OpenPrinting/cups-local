@@ -1,38 +1,9 @@
-main.o: main.c cups-locald.h ../config.h \
+main.o: main.c cupslocald.h ../config.h \
   \
   \
   \
   \
   \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
- 
-dbus.o: dbus.c cups-locald.h ../config.h \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
-  \
- 
-drivers.o: drivers.c cups-locald.h ../config.h \
   \
   \
   \
@@ -50,7 +21,56 @@ drivers.o: drivers.c cups-locald.h ../config.h \
   \
   \
  
-transform.o: transform.c cups-locald.h ../config.h \
+dbus.o: dbus.c cupslocald.h ../config.h \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+ 
+drivers.o: drivers.c cupslocald.h ../config.h \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  \
+  icons.h
+transform.o: transform.c cupslocald.h ../config.h \
+  \
+  \
+  \
+  \
   \
   \
   \

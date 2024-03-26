@@ -1,13 +1,13 @@
 //
-// Transform support for cups-local.
+// Transform support for cupslocald.
 //
-// Copyright © 2023 by OpenPrinting.
+// Copyright © 2023-2024 by OpenPrinting.
 //
 // Licensed under Apache License v2.0.  See the file "LICENSE" for more
 // information.
 //
 
-#include "cups-locald.h"
+#include "cupslocald.h"
 #include <poll.h>
 #include <spawn.h>
 #include <sys/wait.h>
@@ -60,17 +60,42 @@ LocalTransformFilter(
   {
     "copies",
     "finishings",
+    "force-front-side",
+    "image-orientation",
+    "imposition-template",
+    "insert-sheet",
+    "job-error-sheet",
+    "job-name",
+    "job-originating-user-name",
+    "job-pages-per-set",
+    "job-sheet-message",
+    "job-sheets",
+    "job-sheets-col",
     "media",
     "media-col",
+    "multiple-document-handling",
+    "number-up",
     "orientation-requested",
     "output-bin",
+    "overrides",
+    "page-delivery",
     "page-ranges",
     "print-color-mode",
     "print-content-optimize",
     "print-quality",
+    "print-rendering-intent",
     "print-scaling",
     "printer-resolution",
-    "sides"
+    "separator-sheets",
+    "sides",
+    "x-image-position",
+    "x-image-shift",
+    "x-side1-image-shift",
+    "x-side2-image-shift",
+    "y-image-position",
+    "y-image-shift",
+    "y-side1-image-shift",
+    "y-side2-image-shift"
   };
 
 

@@ -7,7 +7,7 @@
 // information.
 //
 
-#include "cups-locald.h"
+#include "cupslocald.h"
 #ifdef HAVE_DBUS
 #  include <dbus/dbus.h>
 
