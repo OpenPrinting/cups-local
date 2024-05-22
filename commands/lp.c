@@ -512,7 +512,7 @@ connect_dest(const char   *command,	// I - Command name
     cupsFreeDests(1, *dest);
     *dest = NULL;
   }
-  else if ((*dinfo = cupsCopyDestInfo(http, *dest)) == NULL)
+  else if ((*dinfo = cupsCopyDestInfo(http, *dest, CUPS_DEST_FLAGS_NONE)) == NULL)
   {
     cupsLangPrintf(stderr, _("%s: Unable to get information on '%s': %s"), command, (*dest)->name, cupsGetErrorString());
 
