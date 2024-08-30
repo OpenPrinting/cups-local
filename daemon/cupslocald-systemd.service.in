@@ -5,3 +5,4 @@ Description=CUPS Local Spooler
 Type=dbus
 BusName=org.openprinting.cups-locald
 ExecStart=@sbindir@/cups-locald
+Slice=system-cups.slice
