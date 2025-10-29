@@ -1,7 +1,7 @@
 //
 // Transform support for cupslocald.
 //
-// Copyright © 2023-2024 by OpenPrinting.
+// Copyright © 2023-2025 by OpenPrinting.
 //
 // Licensed under Apache License v2.0.  See the file "LICENSE" for more
 // information.
@@ -375,7 +375,7 @@ process_attr_message(
 
 
   // Grab attributes from the message line...
-  num_options = cupsParseOptions(message, num_options, &options);
+  num_options = cupsParseOptions(message, /*end*/NULL, num_options, &options);
 
   if ((value = cupsGetIntegerOption("job-impressions", num_options, options)) > 0)
     papplJobSetImpressions(job, value);

@@ -1,7 +1,7 @@
 //
 // "lpadmin" command for CUPS.
 //
-// Copyright © 2021-2023 by OpenPrinting.
+// Copyright © 2021-2025 by OpenPrinting.
 // Copyright © 2007-2021 by Apple Inc.
 // Copyright © 1997-2006 by Easy Software Products.
 //
@@ -277,7 +277,7 @@ main(int  argc,				// I - Number of command-line arguments
 	  case 'o' : // -o OPTION=VALUE
 	      if (opt[1] != '\0')
 	      {
-		num_options = cupsParseOptions(opt + 1, num_options, &options);
+		num_options = cupsParseOptions(opt + 1, /*end*/NULL, num_options, &options);
 		opt += strlen(opt) - 1;
 	      }
 	      else
@@ -290,7 +290,7 @@ main(int  argc,				// I - Number of command-line arguments
 		  return (usage(stderr));
 		}
 
-		num_options = cupsParseOptions(argv[i], num_options, &options);
+		num_options = cupsParseOptions(argv[i], /*end*/NULL, num_options, &options);
 	      }
 	      break;
 
